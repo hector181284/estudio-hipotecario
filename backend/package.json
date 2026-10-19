@@ -1,0 +1,33 @@
+{
+  "name": "estudio-hipotecario-backend",
+  "version": "0.1.0",
+  "description": "Núcleo de cálculo y gestión de estudios hipotecarios (Clean Architecture & Precisión Decimal)",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/presentation/server.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "start": "node dist/presentation/server.js",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev --name init",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:studio": "prisma studio",
+    "db:push": "prisma db push"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "6.4.1",
+    "decimal.js": "^10.4.3",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.11",
+    "prisma": "6.4.1",
+    "tsx": "^4.23.15",
+    "typescript": "^5.4.5",
+    "vitest": "^1.6.0"
+  }
+}

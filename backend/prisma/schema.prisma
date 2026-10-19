@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model EstudioHipotecario {
+  id                  String   @id @default(uuid())
+  creadoEn            DateTime @default(now())
+  actualizadoEn       DateTime @updatedAt
+
+  // Inmueble
+  precioInmueble      Decimal  @db.Decimal(18, 2)
+  valorTasacion       Decimal? @db.Decimal(18, 2)
+  tipoVivienda        String
+  finalidad           String
+  comunidadAutonoma   String
+
+  // Ahorros
+  ahorrosAportados    Decimal  @db.Decimal(18, 2)
+
+  // Condición financiera
+  modalidad           String
+  plazoAnios          Int
+  tinAnual            Decimal  @db.Decimal(8, 4)
+
+  // Dictamen (resultado)
+  semaforo            String?
+  cuotaMensual        Decimal? @db.Decimal(18, 2)
+  capitalPrestado     Decimal? @db.Decimal(18, 2)
+  ratioLtv            Decimal? @db.Decimal(8, 6)
+  ratioDti            Decimal? @db.Decimal(8, 6)
+  totalGastos         Decimal? @db.Decimal(18, 2)
+  totalFondosPropios  Decimal? @db.Decimal(18, 2)
+  deficitAhorro       Decimal? @db.Decimal(18, 2)
+  alertas             String[]
+  recomendaciones     String[]
+
+  participantes       Participante[]
+}
+
+model Participante {
+  id                      String             @id @default(uuid())
+  estudioId               String
+  estudio                 EstudioHipotecario @relation(fields: [estudioId], references: [id], onDelete: Cascade)
+  rol                     String
+  nombre                  String
+  contrato                String
+  ingresosNetosMensuales  Decimal            @db.Decimal(18, 2)
+  deudasMensualesVigentes Decimal            @db.Decimal(18, 2)
+
+  @@index([estudioId])
+}
+
+model PoliticaRiesgo {
+  id            String   @id @default("default")
+  actualizadoEn DateTime @updatedAt
+  ltvMaximo     Decimal  @db.Decimal(5, 4)
+  dtiMaximo     Decimal  @db.Decimal(5, 4)
+  ltvAlerta     Decimal  @db.Decimal(5, 4)
+  dtiAlerta     Decimal  @db.Decimal(5, 4)
+  plazoMaxAnios Int
+  ahorrosMinPct Decimal  @db.Decimal(5, 4)
+}
+
+model RegistroEuribor {
+  id    String   @id @default(uuid())
+  fecha DateTime
+  valor Decimal  @db.Decimal(8, 4)
+
+  @@unique([fecha])
+}
+
+model TablaTributosCcaa {
+  codigoCcaa String  @id
+  nombre     String
+  itpPct     Decimal @db.Decimal(5, 4)
+  ajdPct     Decimal @db.Decimal(5, 4)
+}
