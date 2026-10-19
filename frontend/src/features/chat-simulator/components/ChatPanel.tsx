@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useMortgageStore } from "@/stores/mortgage-simulator.store";
 import type {
   PropertyType,
@@ -9,450 +9,435 @@ import type {
   RateType,
 } from "@/types/mortgage";
 
-// ── Constantes ────────────────────────────────────────────────────────────────
-
+// ── Opciones de Comunidades Autónomas ──────────────────────────────────────────
 const CCAA_OPTIONS = [
-  { value: "MD", label: "Madrid" },
-  { value: "CT", label: "Cataluña" },
-  { value: "AN", label: "Andalucía" },
-  { value: "VC", label: "C. Valenciana" },
-  { value: "PV", label: "País Vasco" },
-  { value: "GA", label: "Galicia" },
-  { value: "CL", label: "Castilla y León" },
-  { value: "CM", label: "Castilla-La Mancha" },
-  { value: "IB", label: "Baleares" },
-  { value: "CN", label: "Canarias" },
+  { value: "MD", label: "Madrid (ITP 6%)" },
+  { value: "CT", label: "Cataluña (ITP 10%)" },
+  { value: "AN", label: "Andalucía (ITP 7%)" },
+  { value: "VC", label: "C. Valenciana (ITP 10%)" },
+  { value: "PV", label: "País Vasco (ITP 4%)" },
+  { value: "GA", label: "Galicia (ITP 8%)" },
+  { value: "CL", label: "Castilla y León (ITP 8%)" },
+  { value: "CM", label: "Castilla-La Mancha (ITP 9%)" },
+  { value: "IB", label: "Baleares (ITP 8%)" },
+  { value: "CN", label: "Canarias (ITP 6.5%)" },
 ];
 
-const STEPS = [
-  { id: 1, label: "Propósito", icon: "🏠" },
-  { id: 2, label: "Inmueble", icon: "📐" },
-  { id: 3, label: "Ahorros", icon: "💰" },
-  { id: 4, label: "Ingresos", icon: "💼" },
-  { id: 5, label: "Hipoteca", icon: "📋" },
-];
+export default function ChatPanel() {
+  const { params, setParam, setCondicion, setTitular, loadScenario, reset, result, isLoading } = useMortgageStore();
 
-// ── Sub-componentes ────────────────────────────────────────────────────────────
+  // Nivel de progreso en la conversación (hasta qué paso se ha desbloqueado)
+  const [maxUnlockedStep, setMaxUnlockedStep] = useState<number>(5);
+  const chatBottomRef = useRef<HTMLDivElement>(null);
 
-function StepProgress({ current }: { current: number }) {
-  return (
-    <div className="flex items-center gap-1 px-4 py-3 bg-white border-b border-slate-200">
-      {STEPS.map((step, i) => (
-        <React.Fragment key={step.id}>
-          <button
-            className={`flex flex-col items-center gap-0.5 min-w-0 flex-1 transition-all ${
-              step.id === current
-                ? "text-blue-700"
-                : step.id < current
-                ? "text-emerald-600"
-                : "text-slate-400"
-            }`}
-          >
-            <span className="text-base">{step.id < current ? "✅" : step.icon}</span>
-            <span className="text-[10px] font-medium leading-tight text-center truncate w-full">
-              {step.label}
-            </span>
-          </button>
-          {i < STEPS.length - 1 && (
-            <div
-              className={`h-px flex-1 min-w-[8px] max-w-[24px] transition-all ${
-                step.id < current ? "bg-emerald-400" : "bg-slate-200"
-              }`}
-            />
-          )}
-        </React.Fragment>
-      ))}
-    </div>
-  );
-}
-
-function BotBubble({ text }: { text: string }) {
-  return (
-    <div className="flex items-start gap-2 mb-3">
-      <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0 text-white text-xs font-bold shadow">
-        A
-      </div>
-      <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-slate-700 shadow-sm max-w-[85%]">
-        {text}
-      </div>
-    </div>
-  );
-}
-
-function SliderInput({
-  label,
-  value,
-  min,
-  max,
-  step,
-  format,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  format: (v: number) => string;
-  onChange: (v: number) => void;
-}) {
-  return (
-    <div className="mb-4">
-      <div className="flex justify-between items-center mb-1">
-        <span className="text-xs font-medium text-slate-600">{label}</span>
-        <span className="text-sm font-semibold text-blue-700">{format(value)}</span>
-      </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-blue-600"
-      />
-      <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
-        <span>{format(min)}</span>
-        <span>{format(max)}</span>
-      </div>
-    </div>
-  );
-}
-
-function SelectInput<T extends string>({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: T;
-  options: { value: T; label: string }[];
-  onChange: (v: T) => void;
-}) {
-  return (
-    <div className="mb-3">
-      <label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value as T)}
-        className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-function NumberInput({
-  label,
-  value,
-  unit,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  unit: string;
-  onChange: (v: number) => void;
-}) {
-  return (
-    <div className="mb-3">
-      <label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>
-      <div className="flex items-center border border-slate-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500">
-        <input
-          type="number"
-          value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
-          className="flex-1 text-sm px-3 py-2 bg-white text-slate-800 outline-none"
-        />
-        <span className="bg-slate-100 px-3 py-2 text-xs text-slate-500 border-l border-slate-200">
-          {unit}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-// ── Steps Content ─────────────────────────────────────────────────────────────
-
-function Step1Proposito() {
-  const { params, setParam } = useMortgageStore();
+  // Auto scroll suave al final del chat cuando se desbloquea un nuevo paso
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [maxUnlockedStep]);
 
   return (
-    <div>
-      <BotBubble text="¡Hola! Soy tu asistente hipotecario. ¿Para qué necesitas la hipoteca?" />
-      <div className="grid grid-cols-1 gap-2 ml-9 mb-4">
-        {(
-          [
-            { value: "primera_vivienda", label: "🏡 Primera vivienda", desc: "Residencia habitual" },
-            { value: "segunda_residencia", label: "🏖️ Segunda residencia", desc: "Vacacional o inversión" },
-            { value: "inversion", label: "📈 Inversión", desc: "Para alquilar o plusvalías" },
-          ] as { value: LoanPurpose; label: string; desc: string }[]
-        ).map((opt) => (
-          <button
-            key={opt.value}
-            onClick={() => setParam("finalidad", opt.value)}
-            className={`text-left p-3 rounded-xl border-2 transition-all text-sm ${
-              params.finalidad === opt.value
-                ? "border-blue-500 bg-blue-50 text-blue-800"
-                : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
-            }`}
-          >
-            <div className="font-medium">{opt.label}</div>
-            <div className="text-xs text-slate-500 mt-0.5">{opt.desc}</div>
-          </button>
-        ))}
-      </div>
-      <BotBubble text="¿Tipo de vivienda?" />
-      <div className="grid grid-cols-2 gap-2 ml-9">
-        {(
-          [
-            { value: "segunda_mano", label: "🔑 Segunda mano" },
-            { value: "obra_nueva", label: "🏗️ Obra nueva" },
-          ] as { value: PropertyType; label: string }[]
-        ).map((opt) => (
-          <button
-            key={opt.value}
-            onClick={() => setParam("tipoVivienda", opt.value)}
-            className={`p-3 rounded-xl border-2 transition-all text-sm font-medium ${
-              params.tipoVivienda === opt.value
-                ? "border-blue-500 bg-blue-50 text-blue-800"
-                : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
-            }`}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function Step2Inmueble() {
-  const { params, setParam } = useMortgageStore();
-
-  return (
-    <div>
-      <BotBubble text="¿Cuánto cuesta el inmueble y dónde está?" />
-      <div className="ml-9">
-        <SliderInput
-          label="Precio del inmueble"
-          value={params.precioInmueble}
-          min={50000}
-          max={1000000}
-          step={5000}
-          format={(v) => `${v.toLocaleString("es-ES")} €`}
-          onChange={(v) => setParam("precioInmueble", v)}
-        />
-        <SelectInput
-          label="Comunidad Autónoma"
-          value={params.comunidadAutonoma}
-          options={CCAA_OPTIONS}
-          onChange={(v) => setParam("comunidadAutonoma", v)}
-        />
-      </div>
-    </div>
-  );
-}
-
-function Step3Ahorros() {
-  const { params, setParam } = useMortgageStore();
-  const minRecom = Math.round(params.precioInmueble * 0.3);
-
-  return (
-    <div>
-      <BotBubble text="¿Cuánto puedes aportar de tus ahorros? Recomendamos al menos un 30% (gastos + entrada)." />
-      <div className="ml-9">
-        <SliderInput
-          label="Ahorros disponibles"
-          value={params.ahorrosAportados}
-          min={0}
-          max={params.precioInmueble}
-          step={1000}
-          format={(v) => `${v.toLocaleString("es-ES")} €`}
-          onChange={(v) => setParam("ahorrosAportados", v)}
-        />
-        {params.ahorrosAportados < minRecom && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
-            ⚠️ Para una financiación cómoda se recomienda tener{" "}
-            <strong>{minRecom.toLocaleString("es-ES")} €</strong> (30%). El resultado reflejará
-            la viabilidad real con tus ahorros actuales.
+    <div className="flex flex-col h-full bg-slate-50">
+      {/* ── Cabecera de estado del Asistente ── */}
+      <div className="px-5 py-3.5 bg-white border-b border-slate-200 flex items-center justify-between shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <div className="w-9 h-9 rounded-full bg-linear-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">
+              🏦
+            </div>
+            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white"></span>
           </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Step4Ingresos() {
-  const { params, setTitular } = useMortgageStore();
-
-  return (
-    <div>
-      <BotBubble text="Cuéntame sobre tu situación laboral y económica." />
-      <div className="ml-9">
-        <SelectInput
-          label="Tipo de contrato"
-          value={params.titularPrincipal.contrato}
-          options={[
-            { value: "indefinido", label: "Indefinido" },
-            { value: "funcionario", label: "Funcionario" },
-            { value: "autonomo", label: "Autónomo" },
-            { value: "temporal", label: "Temporal" },
-            { value: "pensionista", label: "Pensionista" },
-          ]}
-          onChange={(v) => setTitular("contrato", v as EmploymentType)}
-        />
-        <NumberInput
-          label="Ingresos netos mensuales"
-          value={params.titularPrincipal.ingresosNetosMensuales}
-          unit="€/mes"
-          onChange={(v) => setTitular("ingresosNetosMensuales", v)}
-        />
-        <NumberInput
-          label="Cuotas de deudas vigentes (coches, otros préstamos…)"
-          value={params.titularPrincipal.deudasMensualesVigentes}
-          unit="€/mes"
-          onChange={(v) => setTitular("deudasMensualesVigentes", v)}
-        />
-      </div>
-    </div>
-  );
-}
-
-function Step5Hipoteca() {
-  const { params, setCondicion } = useMortgageStore();
-
-  return (
-    <div>
-      <BotBubble text="Por último, configura las condiciones de la hipoteca." />
-      <div className="ml-9">
-        <div className="mb-4">
-          <label className="block text-xs font-medium text-slate-600 mb-2">Modalidad de tipo</label>
-          <div className="grid grid-cols-3 gap-2">
-            {(
-              [
-                { value: "fijo", label: "🔒 Fijo" },
-                { value: "variable", label: "📊 Variable" },
-                { value: "mixto", label: "🔄 Mixto" },
-              ] as { value: RateType; label: string }[]
-            ).map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setCondicion("modalidad", opt.value)}
-                className={`p-2 rounded-lg border-2 text-xs font-medium transition-all ${
-                  params.condicion.modalidad === opt.value
-                    ? "border-blue-500 bg-blue-50 text-blue-800"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
+          <div>
+            <h2 className="text-sm font-bold text-slate-800">Asesor Hipotecario IA</h2>
+            <p className="text-[11px] text-slate-400">
+              {isLoading ? "Recalculando viabilidad en tiempo real..." : "Simulación activa y conectada"}
+            </p>
           </div>
         </div>
 
-        <SliderInput
-          label="Plazo de amortización"
-          value={params.condicion.plazoAnios}
-          min={5}
-          max={30}
-          step={1}
-          format={(v) => `${v} años`}
-          onChange={(v) => setCondicion("plazoAnios", v)}
-        />
-
-        <SliderInput
-          label="TIN anual"
-          value={params.condicion.tinAnual}
-          min={0.5}
-          max={6}
-          step={0.05}
-          format={(v) => `${v.toFixed(2)}%`}
-          onChange={(v) => setCondicion("tinAnual", v)}
-        />
-      </div>
-    </div>
-  );
-}
-
-// ── Panel Principal ────────────────────────────────────────────────────────────
-
-export default function ChatPanel() {
-  const { params, loadScenario, reset, activeStep } = useMortgageStore();
-  const [step, setStep] = useState(activeStep);
-
-  const totalSteps = STEPS.length;
-
-  function renderStep() {
-    switch (step) {
-      case 1: return <Step1Proposito />;
-      case 2: return <Step2Inmueble />;
-      case 3: return <Step3Ahorros />;
-      case 4: return <Step4Ingresos />;
-      case 5: return <Step5Hipoteca />;
-      default: return null;
-    }
-  }
-
-  return (
-    <div className="flex flex-col h-full">
-      {/* Progress stepper */}
-      <StepProgress current={step} />
-
-      {/* Scenarios pill row */}
-      <div className="flex gap-2 px-4 py-2 bg-slate-50 border-b border-slate-100 overflow-x-auto scrollbar-hide">
-        <span className="text-[10px] text-slate-500 self-center whitespace-nowrap">Demo:</span>
-        {(["viable", "ltv_alert", "dti_alert"] as const).map((s) => (
+        {/* Botones de Escenarios Rápidos */}
+        <div className="flex items-center gap-1.5">
           <button
-            key={s}
-            onClick={() => loadScenario(s)}
-            className="text-[10px] px-2 py-1 rounded-full border border-slate-300 text-slate-600 hover:bg-slate-200 whitespace-nowrap transition"
+            onClick={() => {
+              loadScenario("viable");
+              setMaxUnlockedStep(5);
+            }}
+            className="text-[11px] px-2.5 py-1 rounded-full font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition cursor-pointer"
           >
-            {s === "viable" ? "✅ Viable" : s === "ltv_alert" ? "⚠️ LTV alto" : "🔴 DTI alto"}
+            ✅ Viable
           </button>
-        ))}
-        <button
-          onClick={reset}
-          className="text-[10px] px-2 py-1 rounded-full border border-slate-300 text-slate-500 hover:bg-slate-200 whitespace-nowrap transition ml-auto"
-        >
-          ↺ Reset
-        </button>
-      </div>
-
-      {/* Chat content */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
-        {renderStep()}
-      </div>
-
-      {/* Navigation */}
-      <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200 bg-white">
-        <button
-          onClick={() => setStep((s) => Math.max(1, s - 1))}
-          disabled={step === 1}
-          className="px-4 py-2 text-sm font-medium text-slate-600 rounded-lg border border-slate-300 disabled:opacity-40 hover:bg-slate-50 transition"
-        >
-          ← Anterior
-        </button>
-        <span className="text-xs text-slate-400">
-          {step}/{totalSteps}
-        </span>
-        {step < totalSteps ? (
           <button
-            onClick={() => setStep((s) => Math.min(totalSteps, s + 1))}
-            className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition"
+            onClick={() => {
+              loadScenario("ltv_alert");
+              setMaxUnlockedStep(5);
+            }}
+            className="text-[11px] px-2.5 py-1 rounded-full font-medium bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition cursor-pointer"
           >
-            Siguiente →
+            ⚠️ LTV Alto
           </button>
-        ) : (
-          <button className="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition">
-            Ver resultado ✓
+          <button
+            onClick={() => {
+              loadScenario("dti_alert");
+              setMaxUnlockedStep(5);
+            }}
+            className="text-[11px] px-2.5 py-1 rounded-full font-medium bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition cursor-pointer"
+          >
+            🔴 DTI Alto
           </button>
+          <button
+            onClick={() => {
+              reset();
+              setMaxUnlockedStep(1);
+            }}
+            title="Reiniciar chat"
+            className="text-slate-400 hover:text-slate-600 p-1 text-sm cursor-pointer ml-1"
+          >
+            ↺
+          </button>
+        </div>
+      </div>
+
+      {/* ── Hilo continuo del Chat ── */}
+      <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6">
+        
+        {/* ================= PASO 1 ================= */}
+        <div className="space-y-3">
+          <div className="flex items-start gap-2.5 max-w-[90%]">
+            <div className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs shrink-0 font-bold">
+              IA
+            </div>
+            <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-xs p-3.5 shadow-xs text-sm text-slate-800">
+              <p className="font-semibold text-blue-900 mb-1">¡Hola! Vamos a calcular la viabilidad de tu hipoteca.</p>
+              <p className="text-slate-600">Para empezar, ¿cuál es la finalidad de la vivienda y qué tipo de inmueble es?</p>
+            </div>
+          </div>
+
+          <div className="ml-9 space-y-3 bg-white/60 p-3.5 rounded-2xl border border-slate-200/80">
+            <div>
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">Finalidad</span>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { value: "primera_vivienda", label: "🏡 Habitual", desc: "Hasta 80% LTV" },
+                  { value: "segunda_residencia", label: "🏖️ Segunda", desc: "Hasta 70% LTV" },
+                  { value: "inversion", label: "📈 Inversión", desc: "Alquiler" },
+                ].map((f) => (
+                  <button
+                    key={f.value}
+                    onClick={() => {
+                      setParam("finalidad", f.value as LoanPurpose);
+                      if (maxUnlockedStep < 2) setMaxUnlockedStep(2);
+                    }}
+                    className={`p-2.5 rounded-xl border text-left transition cursor-pointer ${
+                      params.finalidad === f.value
+                        ? "bg-blue-50 border-blue-600 text-blue-900 font-bold shadow-xs ring-1 ring-blue-600"
+                        : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
+                    }`}
+                  >
+                    <div className="text-xs font-semibold">{f.label}</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">{f.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">Tipo de Inmueble</span>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { value: "segunda_mano", label: "🔑 Segunda Mano", desc: "Tributa por ITP" },
+                  { value: "obra_nueva", label: "🏗️ Obra Nueva", desc: "Tributa por IVA + AJD" },
+                ].map((t) => (
+                  <button
+                    key={t.value}
+                    onClick={() => {
+                      setParam("tipoVivienda", t.value as PropertyType);
+                      if (maxUnlockedStep < 2) setMaxUnlockedStep(2);
+                    }}
+                    className={`p-2.5 rounded-xl border text-left transition cursor-pointer ${
+                      params.tipoVivienda === t.value
+                        ? "bg-blue-50 border-blue-600 text-blue-900 font-bold shadow-xs ring-1 ring-blue-600"
+                        : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
+                    }`}
+                  >
+                    <div className="text-xs font-semibold">{t.label}</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">{t.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ================= PASO 2 ================= */}
+        {maxUnlockedStep >= 2 && (
+          <div className="space-y-3 animate-in fade-in slide-in-from-bottom-3 duration-300">
+            <div className="flex items-start gap-2.5 max-w-[90%]">
+              <div className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs shrink-0 font-bold">
+                IA
+              </div>
+              <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-xs p-3.5 shadow-xs text-sm text-slate-800">
+                <p>Perfecto. ¿Cuánto cuesta la vivienda y en qué Comunidad Autónoma está ubicada?</p>
+                <p className="text-xs text-slate-500 mt-1">Los impuestos cambian significativamente según la autonomía.</p>
+              </div>
+            </div>
+
+            <div className="ml-9 space-y-4 bg-white/60 p-4 rounded-2xl border border-slate-200/80">
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <label className="text-xs font-semibold text-slate-700">Precio de compraventa:</label>
+                  <span className="text-base font-extrabold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-lg border border-blue-100">
+                    {params.precioInmueble.toLocaleString("es-ES")} €
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={50000}
+                  max={900000}
+                  step={5000}
+                  value={params.precioInmueble}
+                  onChange={(e) => {
+                    setParam("precioInmueble", Number(e.target.value));
+                    if (maxUnlockedStep < 3) setMaxUnlockedStep(3);
+                  }}
+                  className="w-full h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-blue-600"
+                />
+                <div className="flex justify-between text-[10px] text-slate-400 mt-1 font-mono">
+                  <span>50.000 €</span>
+                  <span>500.000 €</span>
+                  <span>900.000 €</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1.5">Comunidad Autónoma:</label>
+                <select
+                  value={params.comunidadAutonoma}
+                  onChange={(e) => {
+                    setParam("comunidadAutonoma", e.target.value);
+                    if (maxUnlockedStep < 3) setMaxUnlockedStep(3);
+                  }}
+                  className="w-full text-xs font-medium border border-slate-300 rounded-xl px-3 py-2.5 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
+                >
+                  {CCAA_OPTIONS.map((c) => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
         )}
+
+        {/* ================= PASO 3 ================= */}
+        {maxUnlockedStep >= 3 && (
+          <div className="space-y-3 animate-in fade-in slide-in-from-bottom-3 duration-300">
+            <div className="flex items-start gap-2.5 max-w-[90%]">
+              <div className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs shrink-0 font-bold">
+                IA
+              </div>
+              <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-xs p-3.5 shadow-xs text-sm text-slate-800">
+                <p>¿Qué cantidad de ahorros propios tienes disponibles para aportar?</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Ten en cuenta que los bancos financian hasta el 80% del valor, por lo que necesitarás aproximadamente un 20% de entrada más un 10% adicional para impuestos y gastos.
+                </p>
+              </div>
+            </div>
+
+            <div className="ml-9 space-y-3 bg-white/60 p-4 rounded-2xl border border-slate-200/80">
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-xs font-semibold text-slate-700">Ahorros aportados:</label>
+                <span className="text-base font-extrabold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-lg border border-blue-100">
+                  {params.ahorrosAportados.toLocaleString("es-ES")} €
+                </span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={Math.max(params.precioInmueble * 0.7, 150000)}
+                step={2500}
+                value={params.ahorrosAportados}
+                onChange={(e) => {
+                  setParam("ahorrosAportados", Number(e.target.value));
+                  if (maxUnlockedStep < 4) setMaxUnlockedStep(4);
+                }}
+                className="w-full h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-blue-600"
+              />
+              <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+                <span>0 € (100% financiación)</span>
+                <span>{(params.precioInmueble * 0.3).toLocaleString("es-ES")} € (30% recomendado)</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ================= PASO 4 ================= */}
+        {maxUnlockedStep >= 4 && (
+          <div className="space-y-3 animate-in fade-in slide-in-from-bottom-3 duration-300">
+            <div className="flex items-start gap-2.5 max-w-[90%]">
+              <div className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs shrink-0 font-bold">
+                IA
+              </div>
+              <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-xs p-3.5 shadow-xs text-sm text-slate-800">
+                <p>Ahora analicemos la solvencia y capacidad de pago mensual.</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  El Banco de España exige que la cuota de la hipoteca junto a tus otros préstamos no supere el 35% de tus ingresos netos mensuales (Ratio DTI).
+                </p>
+              </div>
+            </div>
+
+            <div className="ml-9 space-y-4 bg-white/60 p-4 rounded-2xl border border-slate-200/80">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Tipo de contrato</label>
+                  <select
+                    value={params.titularPrincipal.contrato}
+                    onChange={(e) => setTitular("contrato", e.target.value as EmploymentType)}
+                    className="w-full text-xs font-medium border border-slate-300 rounded-xl px-2.5 py-2 bg-white text-slate-800 outline-none"
+                  >
+                    <option value="indefinido">Indefinido</option>
+                    <option value="funcionario">Funcionario</option>
+                    <option value="autonomo">Autónomo</option>
+                    <option value="temporal">Temporal</option>
+                    <option value="pensionista">Pensionista</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Ingresos netos/mes</label>
+                  <div className="flex items-center border border-slate-300 rounded-xl px-2.5 py-1.5 bg-white focus-within:ring-2 focus-within:ring-blue-500">
+                    <input
+                      type="number"
+                      step={50}
+                      value={params.titularPrincipal.ingresosNetosMensuales}
+                      onChange={(e) => {
+                        setTitular("ingresosNetosMensuales", Number(e.target.value));
+                        if (maxUnlockedStep < 5) setMaxUnlockedStep(5);
+                      }}
+                      className="w-full text-xs font-bold text-slate-800 outline-none"
+                    />
+                    <span className="text-[11px] text-slate-400 ml-1">€/mes</span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  Cuotas de otros préstamos o deudas vigentes
+                </label>
+                <div className="flex items-center border border-slate-300 rounded-xl px-3 py-1.5 bg-white focus-within:ring-2 focus-within:ring-blue-500">
+                  <input
+                    type="number"
+                    step={25}
+                    value={params.titularPrincipal.deudasMensualesVigentes}
+                    onChange={(e) => setTitular("deudasMensualesVigentes", Number(e.target.value))}
+                    className="w-full text-xs font-bold text-slate-800 outline-none"
+                  />
+                  <span className="text-[11px] text-slate-400 ml-1">€/mes</span>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">Préstamos de coche, tarjetas de crédito, etc.</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ================= PASO 5 ================= */}
+        {maxUnlockedStep >= 5 && (
+          <div className="space-y-3 animate-in fade-in slide-in-from-bottom-3 duration-300">
+            <div className="flex items-start gap-2.5 max-w-[90%]">
+              <div className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs shrink-0 font-bold">
+                IA
+              </div>
+              <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-xs p-3.5 shadow-xs text-sm text-slate-800">
+                <p className="font-semibold text-slate-900">Por último, ajustemos las condiciones financieras de la hipoteca.</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Prueba a mover el plazo o el tipo de interés para ver cómo reacciona tu cuota mensual en el panel derecho.
+                </p>
+              </div>
+            </div>
+
+            <div className="ml-9 space-y-4 bg-white/60 p-4 rounded-2xl border border-slate-200/80">
+              <div>
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">Modalidad</span>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: "fijo", label: "🔒 Fija" },
+                    { value: "variable", label: "📊 Variable" },
+                    { value: "mixto", label: "🔄 Mixta" },
+                  ].map((m) => (
+                    <button
+                      key={m.value}
+                      onClick={() => setCondicion("modalidad", m.value as RateType)}
+                      className={`p-2 rounded-xl border text-center text-xs font-semibold transition cursor-pointer ${
+                        params.condicion.modalidad === m.value
+                          ? "bg-blue-50 border-blue-600 text-blue-900 ring-1 ring-blue-600"
+                          : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-xs font-semibold text-slate-700">Plazo:</label>
+                  <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
+                    {params.condicion.plazoAnios} años
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={10}
+                  max={30}
+                  step={1}
+                  value={params.condicion.plazoAnios}
+                  onChange={(e) => setCondicion("plazoAnios", Number(e.target.value))}
+                  className="w-full h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-blue-600"
+                />
+                <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+                  <span>10 años</span>
+                  <span>20 años</span>
+                  <span>30 años</span>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-xs font-semibold text-slate-700">Tipo de interés anual (TIN):</label>
+                  <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
+                    {params.condicion.tinAnual.toFixed(2)} %
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={1.5}
+                  max={5.5}
+                  step={0.05}
+                  value={params.condicion.tinAnual}
+                  onChange={(e) => setCondicion("tinAnual", Number(e.target.value))}
+                  className="w-full h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-blue-600"
+                />
+                <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+                  <span>1.50 %</span>
+                  <span>3.00 %</span>
+                  <span>5.50 %</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div ref={chatBottomRef} />
+      </div>
+
+      {/* ── Barra inferior informativa ── */}
+      <div className="px-5 py-3 border-t border-slate-200 bg-white flex items-center justify-between text-xs text-slate-500">
+        <span className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          Cálculos sincronizados en tiempo real
+        </span>
+        <span className="font-semibold text-slate-700">
+          Cuota: {result ? result.dictamen.cuotaMensualFormateada : "..."}
+        </span>
       </div>
     </div>
   );
