@@ -11,9 +11,15 @@ export interface EstudioResumen {
   tipoVivienda: string;
 }
 
+export interface EstudioCompletoPersistido {
+  input: SimularEstudioInputDto;
+  output: SimularEstudioOutputDto;
+}
+
 export interface IEstudioRepository {
   guardar(input: SimularEstudioInputDto, output: SimularEstudioOutputDto): Promise<string>;
   buscarPorId(id: string): Promise<SimularEstudioOutputDto | null>;
+  buscarCompletoPorId(id: string): Promise<EstudioCompletoPersistido | null>;
   listar(limite?: number, offset?: number): Promise<EstudioResumen[]>;
   contar(): Promise<number>;
 }

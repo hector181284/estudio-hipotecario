@@ -16,3 +16,27 @@ export async function simularEstudio(input: SimularEstudioInputDto): Promise<Sim
 
   return res.json() as Promise<SimularEstudioOutputDto>;
 }
+
+export interface LeadDto {
+  nombre?: string;
+  email?: string;
+  telefono?: string;
+}
+
+export async function descargarInformePdf(
+  input: SimularEstudioInputDto,
+  lead: LeadDto
+): Promise<Blob> {
+  const res = await fetch(`${API_URL}/api/v1/simular/pdf`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...input, lead }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Error al generar informe PDF" }));
+    throw new Error(err.error ?? "Error al descargar el informe PDF");
+  }
+
+  return res.blob();
+}

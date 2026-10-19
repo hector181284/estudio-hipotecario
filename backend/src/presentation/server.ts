@@ -2,6 +2,7 @@ import http from "node:http";
 import { SimularEstudioHipotecarioUseCase, SimularEstudioInputDto } from "../core/application/use-cases/SimularEstudioHipotecarioUseCase.js";
 import { prisma } from "../infrastructure/database/prisma-client.js";
 import { PrismaEstudioRepository } from "../infrastructure/database/repositories/PrismaEstudioRepository.js";
+import { GeneradorInformePdfService } from "../infrastructure/services/GeneradorInformePdfService.js";
 
 const PORT = process.env.PORT || 4000;
 
@@ -23,8 +24,8 @@ const OPENAPI_SPEC = {
   openapi: "3.0.3",
   info: {
     title: "Estudio Hipotecario API",
-    version: "1.0.0",
-    description: "API de simulación de viabilidad, cálculo de amortización francesa y scoring crediticio (Clean Architecture).",
+    version: "1.1.0",
+    description: "API de simulación de viabilidad, cálculo de amortización francesa, scoring crediticio y generación de informes PDF.",
   },
   servers: [
     {
@@ -39,18 +40,6 @@ const OPENAPI_SPEC = {
         responses: {
           "200": {
             description: "Servicio operativo",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    status: { type: "string", example: "ok" },
-                    service: { type: "string", example: "estudio-hipotecario-backend" },
-                    bd: { type: "string", example: "conectada" },
-                  },
-                },
-              },
-            },
           },
         },
       },
@@ -66,39 +55,32 @@ const OPENAPI_SPEC = {
               schema: {
                 type: "object",
                 required: ["precioInmueble", "tipoVivienda", "finalidad", "comunidadAutonoma", "ahorrosAportados", "titularPrincipal", "condicion"],
+              },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "Dictamen de viabilidad generado" },
+          "400": { description: "Parámetros incorrectos" },
+        },
+      },
+    },
+    "/api/v1/simular/pdf": {
+      post: {
+        summary: "Generar informe PDF directo a partir de parámetros",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
                 properties: {
-                  precioInmueble: { type: "number", example: 250000 },
-                  valorTasacion: { type: "number", example: 260000 },
-                  tipoVivienda: { type: "string", enum: ["segunda_mano", "obra_nueva"], example: "segunda_mano" },
-                  finalidad: { type: "string", enum: ["primera_vivienda", "segunda_residencia", "inversion"], example: "primera_vivienda" },
-                  comunidadAutonoma: { type: "string", example: "MD" },
-                  ahorrosAportados: { type: "number", example: 65000 },
-                  titularPrincipal: {
-                    type: "object",
-                    required: ["nombre", "contrato", "ingresosNetosMensuales", "deudasMensualesVigentes"],
-                    properties: {
-                      nombre: { type: "string", example: "Carlos Gómez" },
-                      contrato: { type: "string", enum: ["indefinido", "funcionario", "autonomo", "temporal", "pensionista"], example: "indefinido" },
-                      ingresosNetosMensuales: { type: "number", example: 3200 },
-                      deudasMensualesVigentes: { type: "number", example: 0 },
-                    },
-                  },
-                  cotitular: {
+                  lead: {
                     type: "object",
                     properties: {
-                      nombre: { type: "string", example: "Laura Díaz" },
-                      contrato: { type: "string", example: "indefinido" },
-                      ingresosNetosMensuales: { type: "number", example: 1800 },
-                      deudasMensualesVigentes: { type: "number", example: 0 },
-                    },
-                  },
-                  condicion: {
-                    type: "object",
-                    required: ["modalidad", "plazoAnios", "tinAnual"],
-                    properties: {
-                      modalidad: { type: "string", enum: ["fijo", "variable", "mixto"], example: "fijo" },
-                      plazoAnios: { type: "number", example: 25 },
-                      tinAnual: { type: "number", example: 2.85 },
+                      nombre: { type: "string" },
+                      email: { type: "string" },
+                      telefono: { type: "string" },
                     },
                   },
                 },
@@ -108,44 +90,8 @@ const OPENAPI_SPEC = {
         },
         responses: {
           "200": {
-            description: "Dictamen de viabilidad y cuadro de amortización generado",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    solicitudId: { type: "string", example: "SOL-1792328123" },
-                    dictamen: {
-                      type: "object",
-                      properties: {
-                        semaforo: { type: "string", example: "favorable" },
-                        cuotaMensual: { type: "number", example: 878.50 },
-                        cuotaMensualFormateada: { type: "string", example: "878,50 €" },
-                        capitalPrestado: { type: "number", example: 185000 },
-                        ratioLtv: { type: "number", example: 74.0 },
-                        ratioDti: { type: "number", example: 27.5 },
-                        totalGastosCompraventa: { type: "number", example: 16655 },
-                        totalFondosPropiosRequeridos: { type: "number", example: 66655 },
-                        deficitAhorro: { type: "number", example: 1655 },
-                        alertas: { type: "array", items: { type: "string" } },
-                        recomendaciones: { type: "array", items: { type: "string" } },
-                      },
-                    },
-                    amortizacion: {
-                      type: "object",
-                      properties: {
-                        totalIntereses: { type: "number", example: 78550 },
-                        totalCosteFinanciacion: { type: "number", example: 263550 },
-                        primerasCuotas: { type: "array", items: { type: "object" } },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-          "400": {
-            description: "Parámetros de solicitud incorrectos",
+            description: "Documento binario PDF generado",
+            content: { "application/pdf": {} },
           },
         },
       },
@@ -153,10 +99,6 @@ const OPENAPI_SPEC = {
     "/api/v1/estudios": {
       get: {
         summary: "Listar estudios hipotecarios persistidos",
-        parameters: [
-          { name: "limit", in: "query", schema: { type: "integer", default: 20 } },
-          { name: "offset", in: "query", schema: { type: "integer", default: 0 } },
-        ],
         responses: {
           "200": { description: "Lista paginada de estudios" },
           "503": { description: "Base de datos no disponible" },
@@ -170,7 +112,19 @@ const OPENAPI_SPEC = {
         responses: {
           "200": { description: "Detalle del estudio" },
           "404": { description: "Estudio no encontrado" },
-          "503": { description: "Base de datos no disponible" },
+        },
+      },
+    },
+    "/api/v1/estudios/{id}/pdf": {
+      get: {
+        summary: "Descargar informe PDF de un estudio guardado",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": {
+            description: "Documento binario PDF del estudio",
+            content: { "application/pdf": {} },
+          },
+          "404": { description: "Estudio no encontrado" },
         },
       },
     },
@@ -297,6 +251,51 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // POST /api/v1/simular/pdf
+  if (req.method === "POST" && urlPath === "/api/v1/simular/pdf") {
+    let body = "";
+    req.on("data", (chunk) => {
+      body += chunk.toString();
+    });
+
+    req.on("end", () => {
+      (async () => {
+        try {
+          const payload = JSON.parse(body);
+          const lead = payload.lead;
+          const input: SimularEstudioInputDto = payload;
+
+          const repo = bdDisponible ? estudioRepository : undefined;
+          const useCase = new SimularEstudioHipotecarioUseCase(repo);
+          const output = await useCase.execute(input);
+
+          const pdfBuffer = await GeneradorInformePdfService.generarBuffer({
+            solicitudId: output.solicitudId,
+            fechaEmision: new Date().toLocaleDateString("es-ES", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            }),
+            lead,
+            input,
+            output,
+          });
+
+          res.writeHead(200, {
+            "Content-Type": "application/pdf",
+            "Content-Disposition": `attachment; filename="informe-hipoteca-${output.solicitudId}.pdf"`,
+            "Content-Length": pdfBuffer.length,
+          });
+          res.end(pdfBuffer);
+        } catch (err: unknown) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: (err as Error).message || "Error al generar informe PDF" }));
+        }
+      })();
+    });
+    return;
+  }
+
   // GET /api/v1/estudios
   if (req.method === "GET" && urlPath === "/api/v1/estudios") {
     (async () => {
@@ -315,6 +314,49 @@ const server = http.createServer((req, res) => {
         ]);
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ total, limite, offset, estudios }, null, 2));
+      } catch (err: unknown) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: (err as Error).message }));
+      }
+    })();
+    return;
+  }
+
+  // GET /api/v1/estudios/:id/pdf
+  const pdfMatch = urlPath.match(/^\/api\/v1\/estudios\/([^/]+)\/pdf$/);
+  if (req.method === "GET" && pdfMatch) {
+    (async () => {
+      if (!bdDisponible) {
+        res.writeHead(503, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Base de datos no disponible" }));
+        return;
+      }
+      try {
+        const id = pdfMatch[1]!;
+        const estudioCompleto = await estudioRepository.buscarCompletoPorId(id);
+        if (!estudioCompleto) {
+          res.writeHead(404, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Estudio no encontrado" }));
+          return;
+        }
+
+        const pdfBuffer = await GeneradorInformePdfService.generarBuffer({
+          solicitudId: id,
+          fechaEmision: new Date().toLocaleDateString("es-ES", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          }),
+          input: estudioCompleto.input,
+          output: estudioCompleto.output,
+        });
+
+        res.writeHead(200, {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="informe-hipoteca-${id}.pdf"`,
+          "Content-Length": pdfBuffer.length,
+        });
+        res.end(pdfBuffer);
       } catch (err: unknown) {
         res.writeHead(500, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: (err as Error).message }));
@@ -361,6 +403,7 @@ server.listen(PORT, () => {
   console.log(`📖 [Swagger UI Interactivo]: http://localhost:${PORT}/docs`);
   console.log(`📋 [OpenAPI JSON Spec]:     http://localhost:${PORT}/openapi.json`);
   console.log(`🎯 [Endpoint Simulación]:   POST http://localhost:${PORT}/api/v1/simular`);
+  console.log(`📄 [Generación PDF]:        POST http://localhost:${PORT}/api/v1/simular/pdf`);
   console.log(`📚 [Estudios]:              GET  http://localhost:${PORT}/api/v1/estudios`);
   console.log(`=========================================================\n`);
 });

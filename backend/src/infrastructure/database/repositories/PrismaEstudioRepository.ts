@@ -1,6 +1,13 @@
 import { prisma } from "../prisma-client.js";
-import type { IEstudioRepository, EstudioResumen } from "../../../core/domain/ports/IEstudioRepository.js";
+import type { IEstudioRepository, EstudioResumen, EstudioCompletoPersistido } from "../../../core/domain/ports/IEstudioRepository.js";
 import type { SimularEstudioInputDto, SimularEstudioOutputDto } from "../../../core/application/use-cases/SimularEstudioHipotecarioUseCase.js";
+import { CalculadoraAmortizacionFrancesa } from "../../../core/domain/services/CalculadoraAmortizacionFrancesa.js";
+import { Money } from "../../../core/domain/value-objects/Money.js";
+import { Percentage } from "../../../core/domain/value-objects/Percentage.js";
+import { PlazoMeses } from "../../../core/domain/value-objects/PlazoMeses.js";
+import type { TipoContratoLaboral } from "../../../core/domain/models/Participante.js";
+import type { TipoVivienda, FinalidadPrestamo } from "../../../core/domain/models/Inmueble.js";
+import type { ModalidadTipo } from "../../../core/domain/models/CondicionFinanciera.js";
 
 export class PrismaEstudioRepository implements IEstudioRepository {
   async guardar(input: SimularEstudioInputDto, output: SimularEstudioOutputDto): Promise<string> {
@@ -59,6 +66,11 @@ export class PrismaEstudioRepository implements IEstudioRepository {
   }
 
   async buscarPorId(id: string): Promise<SimularEstudioOutputDto | null> {
+    const completo = await this.buscarCompletoPorId(id);
+    return completo ? completo.output : null;
+  }
+
+  async buscarCompletoPorId(id: string): Promise<EstudioCompletoPersistido | null> {
     const estudio = await prisma.estudioHipotecario.findUnique({
       where: { id },
       include: { participantes: true },
@@ -72,15 +84,52 @@ export class PrismaEstudioRepository implements IEstudioRepository {
       (titular?.ingresosNetosMensuales.toNumber() ?? 0) +
       (cotitular?.ingresosNetosMensuales.toNumber() ?? 0);
     const cuota = estudio.cuotaMensual?.toNumber() ?? 0;
+    const capital = estudio.capitalPrestado?.toNumber() ?? 0;
 
-    return {
+    const input: SimularEstudioInputDto = {
+      solicitudId: estudio.id,
+      precioInmueble: estudio.precioInmueble.toNumber(),
+      valorTasacion: estudio.valorTasacion ? estudio.valorTasacion.toNumber() : undefined,
+      tipoVivienda: estudio.tipoVivienda as TipoVivienda,
+      finalidad: estudio.finalidad as FinalidadPrestamo,
+      comunidadAutonoma: estudio.comunidadAutonoma,
+      ahorrosAportados: estudio.ahorrosAportados.toNumber(),
+      titularPrincipal: {
+        nombre: titular?.nombre ?? "Titular Principal",
+        contrato: (titular?.contrato ?? "indefinido") as TipoContratoLaboral,
+        ingresosNetosMensuales: titular?.ingresosNetosMensuales.toNumber() ?? 0,
+        deudasMensualesVigentes: titular?.deudasMensualesVigentes.toNumber() ?? 0,
+      },
+      cotitular: cotitular
+        ? {
+            nombre: cotitular.nombre,
+            contrato: cotitular.contrato as TipoContratoLaboral,
+            ingresosNetosMensuales: cotitular.ingresosNetosMensuales.toNumber(),
+            deudasMensualesVigentes: cotitular.deudasMensualesVigentes.toNumber(),
+          }
+        : undefined,
+      condicion: {
+        modalidad: estudio.modalidad as ModalidadTipo,
+        plazoAnios: estudio.plazoAnios,
+        tinAnual: estudio.tinAnual.toNumber(),
+      },
+    };
+
+    // Regenerar cuadro de amortización preciso para el informe
+    const resultadoAmort = CalculadoraAmortizacionFrancesa.generarCuadro(
+      Money.from(capital),
+      Percentage.from(estudio.tinAnual.toNumber()),
+      PlazoMeses.fromYears(estudio.plazoAnios)
+    );
+
+    const output: SimularEstudioOutputDto = {
       solicitudId: estudio.id,
       dictamen: {
         semaforo: estudio.semaforo ?? "desconocido",
         cuotaMensual: cuota,
         cuotaMensualFormateada: `${cuota.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`,
-        capitalPrestado: estudio.capitalPrestado?.toNumber() ?? 0,
-        capitalPrestadoFormateado: `${(estudio.capitalPrestado?.toNumber() ?? 0).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`,
+        capitalPrestado: capital,
+        capitalPrestadoFormateado: `${capital.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`,
         ratioLtv: estudio.ratioLtv?.toNumber() ?? 0,
         ratioDti: estudio.ratioDti?.toNumber() ?? 0,
         totalGastosCompraventa: estudio.totalGastos?.toNumber() ?? 0,
@@ -92,11 +141,19 @@ export class PrismaEstudioRepository implements IEstudioRepository {
         recomendaciones: estudio.recomendaciones,
       },
       amortizacion: {
-        totalIntereses: 0,
-        totalCosteFinanciacion: 0,
-        primerasCuotas: [],
+        totalIntereses: resultadoAmort.totalIntereses.toNumber(),
+        totalCosteFinanciacion: resultadoAmort.costeTotalFinanciacion.toNumber(),
+        primerasCuotas: resultadoAmort.lineas.slice(0, 12).map((l) => ({
+          mes: l.numeroMes,
+          cuota: l.cuotaTotal.toNumber(),
+          capital: l.capitalAmortizado.toNumber(),
+          interes: l.interesPagado.toNumber(),
+          pendiente: l.capitalPendiente.toNumber(),
+        })),
       },
     };
+
+    return { input, output };
   }
 
   async listar(limite = 20, offset = 0): Promise<EstudioResumen[]> {
