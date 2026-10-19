@@ -2,39 +2,24 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { SimularEstudioInputDto, SimularEstudioOutputDto, ViabilityStatus } from "@/types/mortgage";
+import { SimularEstudioInputDto, SimularEstudioOutputDto } from "@/types/mortgage";
 import { simularEstudio } from "@/lib/api-client";
 
-interface ChatStep {
-  id: string;
-  type: "bot" | "user";
-  content: string;
-}
-
 interface MortgageSimulatorState {
-  // Parámetros de simulación
   params: SimularEstudioInputDto;
-  // Resultado del backend
   result: SimularEstudioOutputDto | null;
-  // Estado de la UI
   isLoading: boolean;
   error: string | null;
-  activeStep: number;
-  chatHistory: ChatStep[];
+  activeStep: number; // Paso actual (1: Propósito, 2: Precio/CCAA, 3: Ahorros, 4: Ingresos, 5: Hipoteca)
+  hasCompletedSimulation: boolean; // Indica si el usuario ya llegó al final y calculó
 
   // Actions
-  setParam: <K extends keyof SimularEstudioInputDto>(
-    key: K,
-    value: SimularEstudioInputDto[K]
-  ) => void;
-  setCondicion: <K extends keyof SimularEstudioInputDto["condicion"]>(
-    key: K,
-    value: SimularEstudioInputDto["condicion"][K]
-  ) => void;
-  setTitular: <K extends keyof SimularEstudioInputDto["titularPrincipal"]>(
-    key: K,
-    value: SimularEstudioInputDto["titularPrincipal"][K]
-  ) => void;
+  setStep: (step: number) => void;
+  nextStep: () => void;
+  prevStep: () => void;
+  setParam: <K extends keyof SimularEstudioInputDto>(key: K, value: SimularEstudioInputDto[K]) => void;
+  setCondicion: <K extends keyof SimularEstudioInputDto["condicion"]>(key: K, value: SimularEstudioInputDto["condicion"][K]) => void;
+  setTitular: <K extends keyof SimularEstudioInputDto["titularPrincipal"]>(key: K, value: SimularEstudioInputDto["titularPrincipal"][K]) => void;
   runSimulation: () => Promise<void>;
   loadScenario: (type: "viable" | "ltv_alert" | "dti_alert") => void;
   reset: () => void;
@@ -45,7 +30,7 @@ const DEFAULT_PARAMS: SimularEstudioInputDto = {
   tipoVivienda: "segunda_mano",
   finalidad: "primera_vivienda",
   comunidadAutonoma: "MD",
-  ahorrosAportados: 65000,
+  ahorrosAportados: 60000,
   titularPrincipal: {
     nombre: "Titular",
     contrato: "indefinido",
@@ -64,16 +49,19 @@ const SCENARIOS = {
     precioInmueble: 240000,
     ahorrosAportados: 65000,
     titularPrincipal: { ...DEFAULT_PARAMS.titularPrincipal, ingresosNetosMensuales: 3600, deudasMensualesVigentes: 0 },
+    condicion: { modalidad: "fijo" as const, plazoAnios: 25, tinAnual: 2.75 },
   },
   ltv_alert: {
-    precioInmueble: 300000,
+    precioInmueble: 320000,
     ahorrosAportados: 25000,
     titularPrincipal: { ...DEFAULT_PARAMS.titularPrincipal, ingresosNetosMensuales: 3500, deudasMensualesVigentes: 100 },
+    condicion: { modalidad: "fijo" as const, plazoAnios: 25, tinAnual: 2.90 },
   },
   dti_alert: {
     precioInmueble: 200000,
     ahorrosAportados: 50000,
-    titularPrincipal: { ...DEFAULT_PARAMS.titularPrincipal, ingresosNetosMensuales: 1800, deudasMensualesVigentes: 450 },
+    titularPrincipal: { ...DEFAULT_PARAMS.titularPrincipal, ingresosNetosMensuales: 1700, deudasMensualesVigentes: 450 },
+    condicion: { modalidad: "fijo" as const, plazoAnios: 25, tinAnual: 3.10 },
   },
 };
 
@@ -85,12 +73,34 @@ export const useMortgageStore = create<MortgageSimulatorState>()(
       isLoading: false,
       error: null,
       activeStep: 1,
-      chatHistory: [],
+      hasCompletedSimulation: false,
+
+      setStep: (step) => set({ activeStep: step }),
+
+      nextStep: () => {
+        const current = get().activeStep;
+        if (current < 5) {
+          set({ activeStep: current + 1 });
+        } else {
+          // Al completar el paso 5, activa la simulación completa
+          set({ hasCompletedSimulation: true });
+          get().runSimulation();
+        }
+      },
+
+      prevStep: () => {
+        const current = get().activeStep;
+        if (current > 1) {
+          set({ activeStep: current - 1 });
+        }
+      },
 
       setParam: (key, value) => {
         set((s) => ({ params: { ...s.params, [key]: value } }));
-        // Redispara la simulación automáticamente
-        setTimeout(() => get().runSimulation(), 50);
+        // Si ya completó la simulación una vez, recalcula en vivo
+        if (get().hasCompletedSimulation) {
+          setTimeout(() => get().runSimulation(), 60);
+        }
       },
 
       setCondicion: (key, value) => {
@@ -100,7 +110,9 @@ export const useMortgageStore = create<MortgageSimulatorState>()(
             condicion: { ...s.params.condicion, [key]: value },
           },
         }));
-        setTimeout(() => get().runSimulation(), 50);
+        if (get().hasCompletedSimulation) {
+          setTimeout(() => get().runSimulation(), 60);
+        }
       },
 
       setTitular: (key, value) => {
@@ -110,7 +122,9 @@ export const useMortgageStore = create<MortgageSimulatorState>()(
             titularPrincipal: { ...s.params.titularPrincipal, [key]: value },
           },
         }));
-        setTimeout(() => get().runSimulation(), 50);
+        if (get().hasCompletedSimulation) {
+          setTimeout(() => get().runSimulation(), 60);
+        }
       },
 
       runSimulation: async () => {
@@ -118,7 +132,7 @@ export const useMortgageStore = create<MortgageSimulatorState>()(
         set({ isLoading: true, error: null });
         try {
           const result = await simularEstudio(params);
-          set({ result, isLoading: false });
+          set({ result, isLoading: false, hasCompletedSimulation: true });
         } catch (e: any) {
           set({ error: e.message, isLoading: false });
         }
@@ -128,13 +142,20 @@ export const useMortgageStore = create<MortgageSimulatorState>()(
         const scenario = SCENARIOS[type];
         set((s) => ({
           params: { ...s.params, ...scenario },
+          activeStep: 5,
+          hasCompletedSimulation: true,
         }));
         setTimeout(() => get().runSimulation(), 50);
       },
 
       reset: () => {
-        set({ params: DEFAULT_PARAMS, result: null, error: null, activeStep: 1 });
-        setTimeout(() => get().runSimulation(), 50);
+        set({
+          params: DEFAULT_PARAMS,
+          result: null,
+          error: null,
+          activeStep: 1,
+          hasCompletedSimulation: false,
+        });
       },
     }),
     { name: "mortgage-simulator-store" }

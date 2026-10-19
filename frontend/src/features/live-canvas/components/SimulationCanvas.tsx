@@ -17,23 +17,21 @@ import { useMortgageStore } from "@/stores/mortgage-simulator.store";
 import { descargarInformePdf } from "@/lib/api-client";
 import type { ViabilityStatus } from "@/types/mortgage";
 
-// ── Semáforo ──────────────────────────────────────────────────────────────────
-
 const SEMAFORO_CONFIG: Record<
   ViabilityStatus,
   { bg: string; border: string; text: string; badge: string; icon: string; label: string; desc: string }
 > = {
   favorable: {
-    bg: "bg-emerald-50/80",
+    bg: "bg-emerald-50/90",
     border: "border-emerald-300",
     text: "text-emerald-900",
     badge: "bg-emerald-100 text-emerald-800 border-emerald-300",
     icon: "✅",
     label: "OPERACIÓN FAVORABLE",
-    desc: "Cumples con todos los criterios de riesgo bancario (LTV ≤ 80% y DTI ≤ 35%).",
+    desc: "Cumples con todos los criterios de riesgo bancario estándar (LTV ≤ 80% y DTI ≤ 35%).",
   },
   condicionado: {
-    bg: "bg-amber-50/80",
+    bg: "bg-amber-50/90",
     border: "border-amber-300",
     text: "text-amber-900",
     badge: "bg-amber-100 text-amber-800 border-amber-300",
@@ -42,18 +40,18 @@ const SEMAFORO_CONFIG: Record<
     desc: "Cerca de los límites recomendados. Podrías requerir un avalista o aportar más ahorro.",
   },
   riesgo_elevado: {
-    bg: "bg-red-50/80",
+    bg: "bg-red-50/90",
     border: "border-red-300",
     text: "text-red-900",
     badge: "bg-red-100 text-red-800 border-red-300",
     icon: "🔴",
     label: "RIESGO ELEVADO",
-    desc: "El porcentaje financiado o el ratio de endeudamiento supera los máximos regulatorios.",
+    desc: "El porcentaje financiado o el ratio de endeudamiento supera los máximos prudenciales.",
   },
 };
 
 export default function SimulationCanvas() {
-  const { result, isLoading, error, params } = useMortgageStore();
+  const { result, isLoading, error, params, activeStep, hasCompletedSimulation, nextStep } = useMortgageStore();
   const [modalAbierto, setModalAbierto] = useState(false);
   const [leadNombre, setLeadNombre] = useState(params.titularPrincipal.nombre ?? "");
   const [leadEmail, setLeadEmail] = useState("");
@@ -92,55 +90,87 @@ export default function SimulationCanvas() {
     }
   }
 
+  // Si hay error en la petición backend
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center px-8">
         <span className="text-4xl mb-3">⚡</span>
-        <h3 className="text-lg font-semibold text-red-700 mb-1">Error de conexión</h3>
+        <h3 className="text-lg font-bold text-red-700 mb-1">Error de conexión</h3>
         <p className="text-sm text-slate-500">No se pudo conectar con el servidor backend en localhost:4000</p>
         <code className="mt-2 text-xs text-red-600 bg-red-50 px-3 py-1 rounded">{error}</code>
       </div>
     );
   }
 
-  if (!result && !isLoading) {
+  // ── ESTADO INICIAL / EN PROGRESO: El usuario está completando el chat paso a paso ──
+  if (!hasCompletedSimulation || !result) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-center px-8 text-slate-400">
-        <span className="text-5xl mb-4">🏦</span>
-        <p className="text-base font-medium">Configura tu hipoteca en el panel izquierdo</p>
-        <p className="text-sm mt-1">Los resultados reaccionarán aquí en tiempo real</p>
+      <div className="flex flex-col h-full items-center justify-center p-8 text-center bg-slate-50">
+        <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-slate-200/80 shadow-xs space-y-5 animate-in fade-in duration-300">
+          <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-3xl mx-auto shadow-inner">
+            {activeStep === 1 && "🏠"}
+            {activeStep === 2 && "📍"}
+            {activeStep === 3 && "💰"}
+            {activeStep === 4 && "💼"}
+            {activeStep === 5 && "⚡"}
+          </div>
+
+          <div>
+            <span className="text-[11px] font-bold text-blue-600 uppercase tracking-wider bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
+              Paso {activeStep} de 5
+            </span>
+            <h2 className="text-lg font-black text-slate-800 mt-2">
+              {activeStep === 1 && "Define el Inmueble"}
+              {activeStep === 2 && "Precio y Comunidad"}
+              {activeStep === 3 && "Ahorros y Entrada"}
+              {activeStep === 4 && "Capacidad de Pago"}
+              {activeStep === 5 && "Condiciones Financieras"}
+            </h2>
+            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+              {activeStep === 1 && "Indica si la vivienda será tu residencia habitual y si es de segunda mano u obra nueva en el panel izquierdo."}
+              {activeStep === 2 && "Introduce el valor de compraventa y la Comunidad Autónoma para calcular los impuestos fiscales autonómicos."}
+              {activeStep === 3 && "Indica tus fondos propios para analizar el porcentaje de financiación necesario (LTV)."}
+              {activeStep === 4 && "Introduce tus ingresos y cuotas actuales para evaluar tu ratio de endeudamiento bancario (DTI)."}
+              {activeStep === 5 && "Selecciona el plazo y tipo de interés. Al finalizar, desbloquearás el dictamen oficial y la amortización."}
+            </p>
+          </div>
+
+          {/* Tarjeta resumen de datos configurados hasta ahora */}
+          <div className="bg-slate-50 rounded-2xl p-4 text-left border border-slate-200 space-y-2 text-xs">
+            <div className="flex justify-between text-slate-600">
+              <span>Precio inmueble:</span>
+              <span className="font-bold text-slate-800">{params.precioInmueble.toLocaleString("es-ES")} €</span>
+            </div>
+            <div className="flex justify-between text-slate-600">
+              <span>Comunidad:</span>
+              <span className="font-bold text-slate-800">{params.comunidadAutonoma}</span>
+            </div>
+            {activeStep >= 3 && (
+              <div className="flex justify-between text-slate-600">
+                <span>Ahorros aportados:</span>
+                <span className="font-bold text-slate-800">{params.ahorrosAportados.toLocaleString("es-ES")} €</span>
+              </div>
+            )}
+            {activeStep >= 4 && (
+              <div className="flex justify-between text-slate-600">
+                <span>Ingresos netos:</span>
+                <span className="font-bold text-slate-800">{params.titularPrincipal.ingresosNetosMensuales.toLocaleString("es-ES")} €/mes</span>
+              </div>
+            )}
+          </div>
+
+          <div className="pt-2 text-[11px] text-slate-400">
+            👉 Continúa respondiendo en el chat de la izquierda
+          </div>
+        </div>
       </div>
     );
   }
 
-  const { dictamen, amortizacion } = result ?? {
-    dictamen: {
-      semaforo: "favorable" as ViabilityStatus,
-      cuotaMensual: 0,
-      cuotaMensualFormateada: "0,00 €",
-      capitalPrestado: 0,
-      capitalPrestadoFormateado: "0,00 €",
-      ratioLtv: 0,
-      ratioDti: 0,
-      totalGastosCompraventa: 0,
-      totalFondosPropiosRequeridos: 0,
-      deficitAhorro: 0,
-      ingresosNetosTotales: 0,
-      rentaDisponibleTrasCuota: 0,
-      alertas: [],
-      recomendaciones: [],
-    },
-    amortizacion: {
-      totalIntereses: 0,
-      totalCosteFinanciacion: 0,
-      primerasCuotas: [],
-    },
-    solicitudId: "cargando",
-  };
-
+  // ── ESTADO FINAL: SIMULACIÓN DESBLOQUEADA Y REACTIVA ──
+  const { dictamen, amortizacion } = result;
   const sem = SEMAFORO_CONFIG[dictamen.semaforo];
 
-  // Datos para gráfico de amortización
   const chartData = amortizacion.primerasCuotas.map((c) => ({
     mes: `M${c.mes}`,
     Capital: Number(c.capital.toFixed(2)),
@@ -170,7 +200,6 @@ export default function SimulationCanvas() {
             </div>
           </div>
 
-          {/* Cuota Destacada */}
           <div className="bg-white/95 px-5 py-3 rounded-2xl border border-slate-200/80 shadow-xs text-right ml-auto">
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
               Cuota Estimada
