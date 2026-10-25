@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import TopNav from "@/components/layout/TopNav";
+import HistorialView from "./HistorialView";
 import {
   obtenerPoliticas,
   actualizarPoliticas,
@@ -507,16 +508,17 @@ function TablasFiscalesTab() {
 
 // ── Vista Principal ───────────────────────────────────────────────────────────
 
-type AdminTab = "politicas" | "euribor" | "fiscalidad";
+type AdminTab = "politicas" | "euribor" | "fiscalidad" | "historial";
 
 const TABS: { id: AdminTab; label: string; icon: string }[] = [
+  { id: "historial", label: "Historial de Estudios", icon: "📋" },
   { id: "politicas", label: "Políticas de riesgo", icon: "⚖️" },
   { id: "euribor", label: "Euribor / Tipos", icon: "📊" },
   { id: "fiscalidad", label: "Tablas fiscales", icon: "🗺️" },
 ];
 
 export default function AdminView() {
-  const [activeTab, setActiveTab] = useState<AdminTab>("politicas");
+  const [activeTab, setActiveTab] = useState<AdminTab>("historial");
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -550,27 +552,32 @@ export default function AdminView() {
         </div>
       </div>
 
-      <div className="max-w-3xl mx-auto px-6 py-6">
+      {/* max-w wider for historial table */}
+      <div className={activeTab === "historial" ? "max-w-5xl mx-auto px-6 py-6" : "max-w-3xl mx-auto px-6 py-6"}>
         {/* Tabs */}
-        <div className="flex gap-1 bg-white rounded-xl border border-slate-200 p-1 mb-6 shadow-sm">
+        <div className="flex gap-1 bg-white rounded-xl border border-slate-200 p-1 mb-6 shadow-xs flex-wrap">
           {TABS.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2 px-3 rounded-lg transition-all ${
+              className={`flex-1 min-w-[120px] flex items-center justify-center gap-1.5 text-xs font-bold py-2 px-3 rounded-lg transition-all ${
                 activeTab === tab.id
                   ? "bg-blue-600 text-white shadow"
                   : "text-slate-600 hover:bg-slate-100"
               }`}
             >
               <span>{tab.icon}</span>
-              <span className="hidden sm:inline">{tab.label}</span>
+              <span>{tab.label}</span>
+              {tab.id === "historial" && (
+                <span className="text-[9px] bg-white/20 px-1.5 py-0.5 rounded-full font-bold">BD</span>
+              )}
             </button>
           ))}
         </div>
 
         {/* Tab content */}
         <div className="transition-all">
+          {activeTab === "historial" && <HistorialView />}
           {activeTab === "politicas" && <PoliticasTab />}
           {activeTab === "euribor" && <EuriborTab />}
           {activeTab === "fiscalidad" && <TablasFiscalesTab />}

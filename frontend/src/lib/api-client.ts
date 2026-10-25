@@ -108,3 +108,43 @@ export async function actualizarTributos(tributos: TablaTributosDto[]): Promise<
   });
   if (!res.ok) throw new Error("Error al actualizar tablas tributarias");
 }
+
+// ── Historial de Estudios ──────────────────────────────────────────────────────
+
+export interface EstudioResumenDto {
+  id: string;
+  creadoEn: string; // ISO string
+  semaforo: string | null;
+  cuotaMensual: number | null;
+  capitalPrestado: number | null;
+  comunidadAutonoma: string;
+  plazoAnios: number;
+  tipoVivienda: string;
+}
+
+export interface HistorialEstudiosResponse {
+  total: number;
+  limite: number;
+  offset: number;
+  estudios: EstudioResumenDto[];
+}
+
+export async function listarEstudios(
+  limite = 20,
+  offset = 0
+): Promise<HistorialEstudiosResponse> {
+  const res = await fetch(
+    `${API_URL}/api/v1/estudios?limit=${limite}&offset=${offset}`
+  );
+  if (!res.ok) throw new Error("Error al listar estudios");
+  return res.json();
+}
+
+export async function descargarPdfEstudio(id: string): Promise<Blob> {
+  const res = await fetch(`${API_URL}/api/v1/estudios/${id}/pdf`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Error al generar PDF" }));
+    throw new Error(err.error ?? "Error al descargar el PDF del estudio");
+  }
+  return res.blob();
+}
