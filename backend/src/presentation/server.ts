@@ -2,6 +2,9 @@ import http from "node:http";
 import { SimularEstudioHipotecarioUseCase, SimularEstudioInputDto } from "../core/application/use-cases/SimularEstudioHipotecarioUseCase.js";
 import { prisma } from "../infrastructure/database/prisma-client.js";
 import { PrismaEstudioRepository } from "../infrastructure/database/repositories/PrismaEstudioRepository.js";
+import { PrismaPoliticaRiesgoRepository } from "../infrastructure/database/repositories/PrismaPoliticaRiesgoRepository.js";
+import { PrismaEuriborRepository } from "../infrastructure/database/repositories/PrismaEuriborRepository.js";
+import { PrismaTablaTributosRepository } from "../infrastructure/database/repositories/PrismaTablaTributosRepository.js";
 import { GeneradorInformePdfService } from "../infrastructure/services/GeneradorInformePdfService.js";
 
 const PORT = process.env.PORT || 4000;
@@ -18,6 +21,9 @@ prisma.$connect()
   });
 
 const estudioRepository = new PrismaEstudioRepository();
+const politicaRepository = new PrismaPoliticaRiesgoRepository();
+const euriborRepository = new PrismaEuriborRepository();
+const tributosRepository = new PrismaTablaTributosRepository();
 
 // Especificación OpenAPI 3.0 para la API de Estudio Hipotecario
 const OPENAPI_SPEC = {
@@ -128,6 +134,60 @@ const OPENAPI_SPEC = {
         },
       },
     },
+    "/api/v1/maestros/politicas": {
+      get: {
+        summary: "Obtener políticas de riesgo vigentes",
+        responses: {
+          "200": { description: "Políticas de riesgo (LTV, DTI, etc.)" },
+        },
+      },
+      put: {
+        summary: "Actualizar políticas de riesgo",
+        requestBody: {
+          required: true,
+          content: { "application/json": {} },
+        },
+        responses: {
+          "200": { description: "Políticas actualizadas correctamente" },
+        },
+      },
+    },
+    "/api/v1/maestros/euribor": {
+      get: {
+        summary: "Listar histórico mensual de Euribor",
+        responses: {
+          "200": { description: "Serie histórica de valores de Euribor" },
+        },
+      },
+      post: {
+        summary: "Crear o actualizar registro de Euribor mensual",
+        requestBody: {
+          required: true,
+          content: { "application/json": {} },
+        },
+        responses: {
+          "200": { description: "Registro guardado correctamente" },
+        },
+      },
+    },
+    "/api/v1/maestros/tributos": {
+      get: {
+        summary: "Listar tipos impositivos autonómicos (ITP y AJD)",
+        responses: {
+          "200": { description: "Tabla fiscal por Comunidad Autónoma" },
+        },
+      },
+      put: {
+        summary: "Actualizar tipos impositivos de una o varias CCAA",
+        requestBody: {
+          required: true,
+          content: { "application/json": {} },
+        },
+        responses: {
+          "200": { description: "Tipos impositivos actualizados" },
+        },
+      },
+    },
   },
 };
 
@@ -180,9 +240,18 @@ function parseQueryParams(url: string): Record<string, string> {
   return params;
 }
 
+function readBody(req: http.IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    req.on("data", (chunk) => { body += chunk.toString(); });
+    req.on("end", () => resolve(body));
+    req.on("error", reject);
+  });
+}
+
 const server = http.createServer((req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   if (req.method === "OPTIONS") {
@@ -392,6 +461,146 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // GET /api/v1/maestros/politicas
+  if (req.method === "GET" && urlPath === "/api/v1/maestros/politicas") {
+    (async () => {
+      if (!bdDisponible) {
+        res.writeHead(503, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Base de datos no disponible" }));
+        return;
+      }
+      try {
+        const politicas = await politicaRepository.obtener();
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(politicas, null, 2));
+      } catch (err: unknown) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: (err as Error).message }));
+      }
+    })();
+    return;
+  }
+
+  // PUT /api/v1/maestros/politicas
+  if (req.method === "PUT" && urlPath === "/api/v1/maestros/politicas") {
+    (async () => {
+      if (!bdDisponible) {
+        res.writeHead(503, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Base de datos no disponible" }));
+        return;
+      }
+      try {
+        const body = await readBody(req);
+        const dto = JSON.parse(body);
+        await politicaRepository.actualizar(dto);
+        const actualizadas = await politicaRepository.obtener();
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, politicas: actualizadas }, null, 2));
+      } catch (err: unknown) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: (err as Error).message }));
+      }
+    })();
+    return;
+  }
+
+  // GET /api/v1/maestros/euribor
+  if (req.method === "GET" && urlPath === "/api/v1/maestros/euribor") {
+    (async () => {
+      if (!bdDisponible) {
+        res.writeHead(503, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Base de datos no disponible" }));
+        return;
+      }
+      try {
+        const lista = await euriborRepository.listar();
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(lista, null, 2));
+      } catch (err: unknown) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: (err as Error).message }));
+      }
+    })();
+    return;
+  }
+
+  // POST /api/v1/maestros/euribor
+  if (req.method === "POST" && urlPath === "/api/v1/maestros/euribor") {
+    (async () => {
+      if (!bdDisponible) {
+        res.writeHead(503, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Base de datos no disponible" }));
+        return;
+      }
+      try {
+        const body = await readBody(req);
+        const entrada = JSON.parse(body);
+        if (!entrada.fecha || entrada.valor === undefined) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Campos 'fecha' y 'valor' son obligatorios" }));
+          return;
+        }
+        await euriborRepository.upsert({ fecha: entrada.fecha, valor: Number(entrada.valor) });
+        const actualizada = await euriborRepository.listar();
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, registros: actualizada }, null, 2));
+      } catch (err: unknown) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: (err as Error).message }));
+      }
+    })();
+    return;
+  }
+
+  // GET /api/v1/maestros/tributos
+  if (req.method === "GET" && urlPath === "/api/v1/maestros/tributos") {
+    (async () => {
+      if (!bdDisponible) {
+        res.writeHead(503, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Base de datos no disponible" }));
+        return;
+      }
+      try {
+        const tributos = await tributosRepository.listar();
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(tributos, null, 2));
+      } catch (err: unknown) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: (err as Error).message }));
+      }
+    })();
+    return;
+  }
+
+  // PUT /api/v1/maestros/tributos
+  if (req.method === "PUT" && urlPath === "/api/v1/maestros/tributos") {
+    (async () => {
+      if (!bdDisponible) {
+        res.writeHead(503, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Base de datos no disponible" }));
+        return;
+      }
+      try {
+        const body = await readBody(req);
+        const data = JSON.parse(body);
+        if (Array.isArray(data)) {
+          for (const item of data) {
+            await tributosRepository.actualizar(item);
+          }
+        } else {
+          await tributosRepository.actualizar(data);
+        }
+        const actualizados = await tributosRepository.listar();
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, tributos: actualizados }, null, 2));
+      } catch (err: unknown) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: (err as Error).message }));
+      }
+    })();
+    return;
+  }
+
   // 404
   res.writeHead(404, { "Content-Type": "application/json" });
   res.end(JSON.stringify({ error: "Ruta no encontrada" }));
@@ -405,6 +614,9 @@ server.listen(PORT, () => {
   console.log(`🎯 [Endpoint Simulación]:   POST http://localhost:${PORT}/api/v1/simular`);
   console.log(`📄 [Generación PDF]:        POST http://localhost:${PORT}/api/v1/simular/pdf`);
   console.log(`📚 [Estudios]:              GET  http://localhost:${PORT}/api/v1/estudios`);
+  console.log(`⚖️  [Maestros Políticas]:    GET/PUT http://localhost:${PORT}/api/v1/maestros/politicas`);
+  console.log(`📊 [Maestros Euribor]:      GET/POST http://localhost:${PORT}/api/v1/maestros/euribor`);
+  console.log(`🗺️  [Maestros Tributos]:     GET/PUT http://localhost:${PORT}/api/v1/maestros/tributos`);
   console.log(`=========================================================\n`);
 });
 
