@@ -52,7 +52,7 @@ const SEMAFORO_CONFIG: Record<
 };
 
 export default function SimulationCanvas() {
-  const { result, isLoading, error, params, activeStep, hasCompletedSimulation, nextStep, reset } = useMortgageStore();
+  const { result, isLoading, error, params, activeStep, hasCompletedSimulation, nextStep, reset, setParam } = useMortgageStore();
   const [modalAbierto, setModalAbierto] = useState(false);
   const [leadNombre, setLeadNombre] = useState(params.titularPrincipal.nombre ?? "");
   const [leadEmail, setLeadEmail] = useState("");
@@ -225,6 +225,70 @@ export default function SimulationCanvas() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* ── Panel de Ajuste Rápido ── */}
+      <div className="mx-6 mt-4 mb-0 bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+        <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+          <span className="text-sm">🎛️</span>
+          <span className="text-[11px] font-black text-slate-600 uppercase tracking-wider">Ajuste Rápido de Parámetros</span>
+          <span className="ml-auto text-[10px] text-slate-400 italic">Los cambios recalculan el dictamen al instante</span>
+        </div>
+        <div className="px-5 py-4 grid grid-cols-2 gap-x-6 gap-y-4">
+          {/* Precio del Inmueble */}
+          <div>
+            <div className="flex justify-between items-center mb-1.5">
+              <label className="text-[11px] font-bold text-slate-600">🏠 Precio del Inmueble</label>
+              <span className="text-sm font-black text-blue-700">
+                {params.precioInmueble.toLocaleString("es-ES")} €
+              </span>
+            </div>
+            <input
+              type="range"
+              min={50000}
+              max={1500000}
+              step={5000}
+              value={params.precioInmueble}
+              onChange={(e) => setParam("precioInmueble", Number(e.target.value))}
+              className="w-full h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-blue-600"
+            />
+            <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
+              <span>50.000 €</span>
+              <span>1.500.000 €</span>
+            </div>
+          </div>
+
+          {/* Ahorros Aportados */}
+          <div>
+            <div className="flex justify-between items-center mb-1.5">
+              <label className="text-[11px] font-bold text-slate-600">💰 Ahorros Aportados</label>
+              <span className="text-sm font-black text-emerald-700">
+                {params.ahorrosAportados.toLocaleString("es-ES")} €
+              </span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={Math.round(params.precioInmueble * 0.6)}
+              step={1000}
+              value={params.ahorrosAportados}
+              onChange={(e) => setParam("ahorrosAportados", Number(e.target.value))}
+              className="w-full h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-emerald-600"
+            />
+            <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
+              <span>0 €</span>
+              <span>{Math.round(params.precioInmueble * 0.6).toLocaleString("es-ES")} €</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Indicador de recálculo en progreso */}
+        {isLoading && (
+          <div className="px-5 pb-3 flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse" />
+            <span className="text-[10px] text-blue-600 font-semibold">Recalculando dictamen…</span>
+          </div>
+        )}
       </div>
 
       <div className="p-6 space-y-6">
