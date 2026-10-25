@@ -47,18 +47,27 @@ export class GeneradorInformePdfService {
         .text("1. Resumen de la Operación y Participantes", 40, y);
       y += 20;
 
-      doc.rect(40, y, 515, 65).fillAndStroke("#f8fafc", "#e2e8f0");
+      const altoResumen = input.cotitular ? 78 : 65;
+      doc.rect(40, y, 515, altoResumen).fillAndStroke("#f8fafc", "#e2e8f0");
       doc.fillColor("#334155").fontSize(9).font("Helvetica");
 
       const titularNombre = datos.lead?.nombre || input.titularPrincipal.nombre;
       const titularEmail = datos.lead?.email ? ` (${datos.lead.email})` : "";
       
-      doc.text(`Titular Principal: ${titularNombre}${titularEmail}`, 52, y + 10);
-      doc.text(`Situación Laboral: Contrato ${input.titularPrincipal.contrato}  |  Ingresos: ${input.titularPrincipal.ingresosNetosMensuales.toLocaleString("es-ES")} €/mes`, 52, y + 24);
-      doc.text(`Precio Inmueble: ${input.precioInmueble.toLocaleString("es-ES")} €  |  Comunidad: ${input.comunidadAutonoma}  |  Tipo: ${input.tipoVivienda}`, 52, y + 38);
-      doc.text(`Ahorros aportados: ${input.ahorrosAportados.toLocaleString("es-ES")} €  |  Finalidad: ${input.finalidad.replace("_", " ")}`, 52, y + 52);
+      let curY = y + 10;
+      doc.text(`Titular Principal: ${titularNombre}${titularEmail}  |  Contrato: ${input.titularPrincipal.contrato}  |  Ingresos: ${input.titularPrincipal.ingresosNetosMensuales.toLocaleString("es-ES")} €/mes`, 52, curY);
+      curY += 14;
 
-      y += 80;
+      if (input.cotitular) {
+        doc.text(`Cotitular: ${input.cotitular.nombre}  |  Contrato: ${input.cotitular.contrato}  |  Ingresos: ${input.cotitular.ingresosNetosMensuales.toLocaleString("es-ES")} €/mes`, 52, curY);
+        curY += 14;
+      }
+
+      doc.text(`Precio Inmueble: ${input.precioInmueble.toLocaleString("es-ES")} €  |  Comunidad: ${input.comunidadAutonoma}  |  Tipo: ${input.tipoVivienda}`, 52, curY);
+      curY += 14;
+      doc.text(`Ahorros aportados: ${input.ahorrosAportados.toLocaleString("es-ES")} €  |  Finalidad: ${input.finalidad.replace("_", " ")}`, 52, curY);
+
+      y += altoResumen + 15;
 
       // --- Semáforo y Dictamen de Viabilidad ---
       doc.fillColor("#0f172a").fontSize(13).font("Helvetica-Bold")

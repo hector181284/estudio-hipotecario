@@ -154,7 +154,10 @@ export default function SimulationCanvas() {
             {activeStep >= 4 && (
               <div className="flex justify-between text-slate-600">
                 <span>Ingresos netos:</span>
-                <span className="font-bold text-slate-800">{params.titularPrincipal.ingresosNetosMensuales.toLocaleString("es-ES")} €/mes</span>
+                <span className="font-bold text-slate-800 text-right">
+                  {(params.titularPrincipal.ingresosNetosMensuales + (params.cotitular?.ingresosNetosMensuales ?? 0)).toLocaleString("es-ES")} €/mes
+                  {params.cotitular && <span className="text-[10px] text-blue-600 font-semibold block">(Titular + Cotitular)</span>}
+                </span>
               </div>
             )}
           </div>
@@ -286,7 +289,10 @@ export default function SimulationCanvas() {
                 />
               </div>
               <p className="text-[10px] text-slate-400 mt-1.5 flex justify-between">
-                <span>Ingresos: {dictamen.ingresosNetosTotales.toLocaleString("es-ES")} €</span>
+                <span>
+                  Ingresos: {dictamen.ingresosNetosTotales.toLocaleString("es-ES")} €
+                  {params.cotitular ? " (2 titulares)" : ""}
+                </span>
                 <span>Máx: 35%</span>
               </p>
             </div>

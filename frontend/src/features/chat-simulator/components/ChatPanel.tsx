@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef, useEffect } from "react";
+import { cn } from "@/lib/utils";
 import { useMortgageStore } from "@/stores/mortgage-simulator.store";
 import type {
   PropertyType,
@@ -36,6 +37,8 @@ export default function ChatPanel() {
     setParam,
     setCondicion,
     setTitular,
+    setCotitular,
+    setTieneCotitular,
     activeStep,
     setStep,
     nextStep,
@@ -373,6 +376,110 @@ export default function ChatPanel() {
                   />
                   <span className="text-[10px] text-slate-400 ml-1">€/mes</span>
                 </div>
+              </div>
+
+              {/* ── Selector / Toggle Cotitular ── */}
+              <div className="pt-2 border-t border-slate-100">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                    <span>👥</span> ¿Incluir Cotitular / Pareja?
+                  </span>
+                  <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => setTieneCotitular(false)}
+                      className={cn(
+                        "px-2.5 py-1 text-[11px] font-bold rounded-md transition cursor-pointer",
+                        !params.cotitular ? "bg-white text-blue-700 shadow-2xs" : "text-slate-500 hover:text-slate-700"
+                      )}
+                    >
+                      Solo titular
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTieneCotitular(true)}
+                      className={cn(
+                        "px-2.5 py-1 text-[11px] font-bold rounded-md transition cursor-pointer",
+                        params.cotitular ? "bg-white text-blue-700 shadow-2xs" : "text-slate-500 hover:text-slate-700"
+                      )}
+                    >
+                      + Con cotitular
+                    </button>
+                  </div>
+                </div>
+
+                {/* Formulario de Cotitular cuando está activado */}
+                {params.cotitular && (
+                  <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-200/80 space-y-3 mt-2 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-blue-800 flex items-center gap-1">
+                        <span>👤</span> Datos del Segundo Solicitante
+                      </span>
+                      <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-semibold border border-emerald-200">
+                        Suma al DTI conjunto
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                          Contrato cotitular
+                        </label>
+                        <select
+                          value={params.cotitular.contrato}
+                          onChange={(e) => setCotitular("contrato", e.target.value as EmploymentType)}
+                          className="w-full text-xs font-semibold border border-slate-300 rounded-xl px-2.5 py-2 bg-white text-slate-800 outline-none"
+                        >
+                          <option value="indefinido">Indefinido</option>
+                          <option value="funcionario">Funcionario</option>
+                          <option value="autonomo">Autónomo</option>
+                          <option value="temporal">Temporal</option>
+                          <option value="pensionista">Pensionista</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                          Ingresos netos
+                        </label>
+                        <div className="flex items-center border border-slate-300 rounded-xl px-2.5 py-1.5 bg-white">
+                          <input
+                            type="number"
+                            step={50}
+                            value={params.cotitular.ingresosNetosMensuales}
+                            onChange={(e) => setCotitular("ingresosNetosMensuales", Number(e.target.value))}
+                            className="w-full text-xs font-bold text-slate-800 outline-none"
+                          />
+                          <span className="text-[10px] text-slate-400 ml-1">€/mes</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                        Otras deudas o préstamos del cotitular
+                      </label>
+                      <div className="flex items-center border border-slate-300 rounded-xl px-2.5 py-1.5 bg-white">
+                        <input
+                          type="number"
+                          step={25}
+                          value={params.cotitular.deudasMensualesVigentes}
+                          onChange={(e) => setCotitular("deudasMensualesVigentes", Number(e.target.value))}
+                          className="w-full text-xs font-bold text-slate-800 outline-none"
+                        />
+                        <span className="text-[10px] text-slate-400 ml-1">€/mes</span>
+                      </div>
+                    </div>
+
+                    {/* Resumen de ingresos conjuntos */}
+                    <div className="p-2.5 rounded-lg bg-blue-50/70 border border-blue-100 flex items-center justify-between text-xs">
+                      <span className="font-semibold text-blue-900">Total ingresos combinados:</span>
+                      <span className="font-black text-blue-700">
+                        {(params.titularPrincipal.ingresosNetosMensuales + params.cotitular.ingresosNetosMensuales).toLocaleString("es-ES")} €/mes
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {activeStep === 4 && (

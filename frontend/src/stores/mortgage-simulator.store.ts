@@ -20,10 +20,19 @@ interface MortgageSimulatorState {
   setParam: <K extends keyof SimularEstudioInputDto>(key: K, value: SimularEstudioInputDto[K]) => void;
   setCondicion: <K extends keyof SimularEstudioInputDto["condicion"]>(key: K, value: SimularEstudioInputDto["condicion"][K]) => void;
   setTitular: <K extends keyof SimularEstudioInputDto["titularPrincipal"]>(key: K, value: SimularEstudioInputDto["titularPrincipal"][K]) => void;
+  setCotitular: <K extends keyof NonNullable<SimularEstudioInputDto["cotitular"]>>(key: K, value: NonNullable<SimularEstudioInputDto["cotitular"]>[K]) => void;
+  setTieneCotitular: (enabled: boolean) => void;
   runSimulation: () => Promise<void>;
   loadScenario: (type: "viable" | "ltv_alert" | "dti_alert") => void;
   reset: () => void;
 }
+
+const DEFAULT_COTITULAR = {
+  nombre: "Cotitular",
+  contrato: "indefinido" as const,
+  ingresosNetosMensuales: 1800,
+  deudasMensualesVigentes: 0,
+};
 
 const DEFAULT_PARAMS: SimularEstudioInputDto = {
   precioInmueble: 250000,
@@ -120,6 +129,40 @@ export const useMortgageStore = create<MortgageSimulatorState>()(
           params: {
             ...s.params,
             titularPrincipal: { ...s.params.titularPrincipal, [key]: value },
+          },
+        }));
+        if (get().hasCompletedSimulation) {
+          setTimeout(() => get().runSimulation(), 60);
+        }
+      },
+
+      setTieneCotitular: (enabled: boolean) => {
+        set((s) => {
+          if (!enabled) {
+            const nextParams = { ...s.params };
+            delete nextParams.cotitular;
+            return { params: nextParams };
+          }
+          return {
+            params: {
+              ...s.params,
+              cotitular: s.params.cotitular ?? { ...DEFAULT_COTITULAR },
+            },
+          };
+        });
+        if (get().hasCompletedSimulation) {
+          setTimeout(() => get().runSimulation(), 60);
+        }
+      },
+
+      setCotitular: (key, value) => {
+        set((s) => ({
+          params: {
+            ...s.params,
+            cotitular: {
+              ...(s.params.cotitular ?? DEFAULT_COTITULAR),
+              [key]: value,
+            },
           },
         }));
         if (get().hasCompletedSimulation) {
