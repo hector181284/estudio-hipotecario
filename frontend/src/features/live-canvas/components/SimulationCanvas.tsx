@@ -51,7 +51,7 @@ const SEMAFORO_CONFIG: Record<
 };
 
 export default function SimulationCanvas() {
-  const { result, isLoading, error, params, activeStep, hasCompletedSimulation, nextStep } = useMortgageStore();
+  const { result, isLoading, error, params, activeStep, hasCompletedSimulation, nextStep, reset } = useMortgageStore();
   const [modalAbierto, setModalAbierto] = useState(false);
   const [leadNombre, setLeadNombre] = useState(params.titularPrincipal.nombre ?? "");
   const [leadEmail, setLeadEmail] = useState("");
@@ -200,16 +200,25 @@ export default function SimulationCanvas() {
             </div>
           </div>
 
-          <div className="bg-white/95 px-5 py-3 rounded-2xl border border-slate-200/80 shadow-xs text-right ml-auto">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-              Cuota Estimada
-            </span>
-            <span className="text-2xl font-black text-slate-900 tracking-tight transition-all duration-300">
-              {dictamen.cuotaMensualFormateada}
-            </span>
-            <span className="text-[10px] text-slate-500 block">
-              al mes ({params.condicion.plazoAnios} años al {params.condicion.tinAnual.toFixed(2)}%)
-            </span>
+          <div className="flex items-center gap-3 ml-auto">
+            <button
+              onClick={reset}
+              title="Borrar datos y reiniciar estudio"
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-white/90 hover:bg-white text-slate-700 hover:text-blue-700 text-xs font-bold rounded-xl border border-slate-200/80 shadow-xs transition cursor-pointer active:scale-95"
+            >
+              <span>✨</span> Nuevo Cálculo
+            </button>
+            <div className="bg-white/95 px-5 py-3 rounded-2xl border border-slate-200/80 shadow-xs text-right">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                Cuota Estimada
+              </span>
+              <span className="text-2xl font-black text-slate-900 tracking-tight transition-all duration-300">
+                {dictamen.cuotaMensualFormateada}
+              </span>
+              <span className="text-[10px] text-slate-500 block">
+                al mes ({params.condicion.plazoAnios} años al {params.condicion.tinAnual.toFixed(2)}%)
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -393,12 +402,20 @@ export default function SimulationCanvas() {
           <p className="text-xs text-blue-100 max-w-md mx-auto mb-5 leading-relaxed">
             Obtén tu estudio con el cuadro de amortización completo, desglose fiscal por Comunidad Autónoma y certificado orientativo de viabilidad.
           </p>
-          <button
-            onClick={() => setModalAbierto(true)}
-            className="bg-white text-blue-800 font-extrabold text-sm px-6 py-3 rounded-2xl hover:bg-blue-50 transition shadow-md transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
-          >
-            Descargar Informe Oficial en PDF
-          </button>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              onClick={() => setModalAbierto(true)}
+              className="bg-white text-blue-800 font-extrabold text-sm px-6 py-3 rounded-2xl hover:bg-blue-50 transition shadow-md transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+            >
+              Descargar Informe Oficial en PDF
+            </button>
+            <button
+              onClick={reset}
+              className="bg-blue-900/60 hover:bg-blue-900/80 text-white font-bold text-sm px-5 py-3 rounded-2xl transition border border-white/20 cursor-pointer flex items-center gap-1.5"
+            >
+              <span>✨</span> Iniciar Nuevo Cálculo
+            </button>
+          </div>
         </div>
       </div>
 

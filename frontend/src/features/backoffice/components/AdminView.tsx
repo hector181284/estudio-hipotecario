@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
+import TopNav from "@/components/layout/TopNav";
 import {
   obtenerPoliticas,
   actualizarPoliticas,
@@ -517,19 +519,31 @@ export default function AdminView() {
   const [activeTab, setActiveTab] = useState<AdminTab>("politicas");
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+      {/* Top unified navigation */}
+      <TopNav activeTab="admin" />
+
       {/* Admin header */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4 shadow-sm flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-slate-800">
-            🏛️ Portal de Administración
-          </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Configuración de parámetros de riesgo, tipos de interés y tablas fiscales autonómicas
-          </p>
+      <div className="bg-white border-b border-slate-200 px-6 py-4 shadow-xs flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <Link
+            href="/simulador"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-100 transition shadow-2xs"
+            title="Volver al Asistente Conversacional"
+          >
+            <span>←</span> Volver al Asistente
+          </Link>
+          <div>
+            <h1 className="text-lg font-black text-slate-900 leading-tight">
+              🏛️ Portal de Administración y Maestros
+            </h1>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Configuración de parámetros de riesgo, tipos de interés y tablas fiscales autonómicas
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             PostgreSQL Conectado
           </span>

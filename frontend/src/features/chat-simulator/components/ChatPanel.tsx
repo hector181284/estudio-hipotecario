@@ -68,32 +68,14 @@ export default function ChatPanel() {
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-semibold text-slate-400">Demos:</span>
-            <button
-              onClick={() => loadScenario("viable")}
-              className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition cursor-pointer"
-            >
-              ✅ Viable
-            </button>
-            <button
-              onClick={() => loadScenario("ltv_alert")}
-              className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition cursor-pointer"
-            >
-              ⚠️ LTV
-            </button>
-            <button
-              onClick={() => loadScenario("dti_alert")}
-              className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition cursor-pointer"
-            >
-              🔴 DTI
-            </button>
+          <div className="flex items-center gap-2">
             <button
               onClick={reset}
-              title="Reiniciar estudio"
-              className="text-slate-400 hover:text-slate-600 text-xs px-1 cursor-pointer"
+              title="Borrar datos actuales y comenzar un nuevo estudio desde el paso 1"
+              className="flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition cursor-pointer shadow-2xs active:scale-95"
             >
-              ↺
+              <span>✨</span>
+              <span>Nuevo Cálculo</span>
             </button>
           </div>
         </div>
@@ -503,6 +485,25 @@ export default function ChatPanel() {
                   {isLoading ? "Calculando..." : "⚡ Calcular Viabilidad Completa"}
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Tarjeta de Estudio Finalizado con Acción de Nuevo Cálculo ── */}
+        {hasCompletedSimulation && (
+          <div className="bg-linear-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-4 text-center space-y-2.5 shadow-2xs">
+            <span className="text-2xl block">🎉</span>
+            <h4 className="text-xs font-black text-slate-800">¡Estudio Hipotecario Finalizado!</h4>
+            <p className="text-[11px] text-slate-600 leading-relaxed">
+              El dictamen financiero, los ratios de riesgo y el cuadro de amortización ya están disponibles en el panel derecho.
+            </p>
+            <div className="pt-1 flex justify-center">
+              <button
+                onClick={reset}
+                className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer active:scale-95"
+              >
+                <span>✨</span> Iniciar Nuevo Cálculo
+              </button>
             </div>
           </div>
         )}
