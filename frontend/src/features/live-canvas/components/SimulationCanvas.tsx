@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import ComparadorModalidades from "./ComparadorModalidades";
 import {
   AreaChart,
   Area,
@@ -400,6 +401,14 @@ export default function SimulationCanvas() {
             </AreaChart>
           </ResponsiveContainer>
         </div>
+
+        {/* ── Comparador de Modalidades ── */}
+        <ComparadorModalidades
+          capitalBase={dictamen.capitalPrestado}
+          precioInmueble={params.precioInmueble}
+          plazoBase={params.condicion.plazoAnios}
+          tinBase={params.condicion.tinAnual}
+        />
 
         {/* ── Banner Lead Gate PDF ── */}
         <div className="bg-linear-to-r from-blue-700 via-indigo-700 to-indigo-800 rounded-3xl p-6 text-white text-center shadow-lg">
