@@ -31,8 +31,8 @@ model EstudioHipotecario {
   semaforo            String?
   cuotaMensual        Decimal? @db.Decimal(18, 2)
   capitalPrestado     Decimal? @db.Decimal(18, 2)
-  ratioLtv            Decimal? @db.Decimal(8, 6)
-  ratioDti            Decimal? @db.Decimal(8, 6)
+  ratioLtv            Decimal? @db.Decimal(8, 4)
+  ratioDti            Decimal? @db.Decimal(8, 4)
   totalGastos         Decimal? @db.Decimal(18, 2)
   totalFondosPropios  Decimal? @db.Decimal(18, 2)
   deficitAhorro       Decimal? @db.Decimal(18, 2)
