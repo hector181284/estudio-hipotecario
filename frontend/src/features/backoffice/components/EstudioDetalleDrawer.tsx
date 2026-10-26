@@ -1,8 +1,15 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { SimularEstudioOutputDto } from "@/types/mortgage";
-import { obtenerEstudio, descargarPdfEstudio } from "@/lib/api-client";
+import {
+  obtenerEstudio,
+  descargarPdfEstudio,
+  actualizarSeguimientoEstudio,
+  EstudioCompletoResponse,
+  EstadoOperacion,
+  DatosSeguimientoDto,
+} from "@/lib/api-client";
+import { ESTADO_CONFIG } from "./HistorialView";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -39,6 +46,31 @@ const SEMAFORO_CONFIG: Record<
   },
 };
 
+const BANCOS_POPULARES = [
+  "Banco Santander",
+  "BBVA",
+  "CaixaBank",
+  "Banco Sabadell",
+  "Bankinter",
+  "ING",
+  "Abanca",
+  "Unicaja Banco",
+  "Kutxabank",
+  "Ibercaja",
+  "MyInvestor",
+  "Openbank",
+];
+
+const TASADORAS_POPULARES = [
+  "Tinsa",
+  "Sociedad de Tasación (ST)",
+  "Gloval",
+  "Euroval",
+  "CoHispania",
+  "Valmesa",
+  "Arco Valoraciones",
+];
+
 function fmtEuro(val: number | null | undefined): string {
   if (val == null) return "—";
   return val.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
@@ -54,15 +86,31 @@ function fmtPct(val: number | null | undefined): string {
 interface Props {
   estudioId: string | null;
   onClose: () => void;
+  onActualizado?: () => void;
 }
 
 // ── Componente ─────────────────────────────────────────────────────────────────
 
-export default function EstudioDetalleDrawer({ estudioId, onClose }: Props) {
-  const [estudio, setEstudio] = useState<SimularEstudioOutputDto | null>(null);
+export default function EstudioDetalleDrawer({ estudioId, onClose, onActualizado }: Props) {
+  const [estudio, setEstudio] = useState<EstudioCompletoResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [descargando, setDescargando] = useState(false);
+  const [tabActiva, setTabActiva] = useState<"financiero" | "seguimiento">("seguimiento");
+
+  // Estado editable para el seguimiento
+  const [estadoOperacion, setEstadoOperacion] = useState<EstadoOperacion>("estudio_inicial");
+  const [banco, setBanco] = useState("");
+  const [gestor, setGestor] = useState("");
+  const [fechaArras, setFechaArras] = useState("");
+  const [importeArras, setImporteArras] = useState<string>("");
+  const [tasadora, setTasadora] = useState("");
+  const [valorTasacion, setValorTasacion] = useState<string>("");
+  const [notaria, setNotaria] = useState("");
+  const [fechaNotaria, setFechaNotaria] = useState("");
+  const [nuevaNota, setNuevaNota] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [mensajeGuardado, setMensajeGuardado] = useState<string | null>(null);
 
   useEffect(() => {
     if (!estudioId) {
@@ -71,8 +119,23 @@ export default function EstudioDetalleDrawer({ estudioId, onClose }: Props) {
     }
     setLoading(true);
     setError(null);
+    setMensajeGuardado(null);
     obtenerEstudio(estudioId)
-      .then(setEstudio)
+      .then((data) => {
+        setEstudio(data);
+        const seg = data.seguimiento;
+        if (seg) {
+          setEstadoOperacion(seg.estadoOperacion ?? "estudio_inicial");
+          setBanco(seg.bancoSeleccionado ?? "");
+          setGestor(seg.gestorAsignado ?? "");
+          setFechaArras(seg.fechaLimiteArras ? seg.fechaLimiteArras.slice(0, 10) : "");
+          setImporteArras(seg.importeArras ? String(seg.importeArras) : "");
+          setTasadora(seg.tasadora ?? "");
+          setValorTasacion(seg.valorTasacionReal ? String(seg.valorTasacionReal) : "");
+          setNotaria(seg.notaria ?? "");
+          setFechaNotaria(seg.fechaFirmaNotaria ? seg.fechaFirmaNotaria.slice(0, 16) : "");
+        }
+      })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
   }, [estudioId]);
@@ -106,12 +169,48 @@ export default function EstudioDetalleDrawer({ estudioId, onClose }: Props) {
     }
   }
 
-  // Si no hay id seleccionado, no renderiza nada
+  async function handleGuardarSeguimiento(cambioInmediato?: Partial<DatosSeguimientoDto>) {
+    if (!estudioId) return;
+    setGuardando(true);
+    setMensajeGuardado(null);
+    try {
+      const payload: DatosSeguimientoDto = {
+        estadoOperacion: cambioInmediato?.estadoOperacion ?? estadoOperacion,
+        bancoSeleccionado: banco || undefined,
+        gestorAsignado: gestor || undefined,
+        fechaLimiteArras: fechaArras || undefined,
+        importeArras: importeArras ? Number(importeArras) : undefined,
+        tasadora: tasadora || undefined,
+        valorTasacionReal: valorTasacion ? Number(valorTasacion) : undefined,
+        notaria: notaria || undefined,
+        fechaFirmaNotaria: fechaNotaria || undefined,
+        nuevaNota: cambioInmediato?.nuevaNota ?? (nuevaNota.trim() || undefined),
+      };
+
+      await actualizarSeguimientoEstudio(estudioId, payload);
+      setMensajeGuardado("✓ Expediente actualizado con éxito");
+      setNuevaNota("");
+
+      // Recargar datos actualizados
+      const actualizado = await obtenerEstudio(estudioId);
+      setEstudio(actualizado);
+      if (onActualizado) onActualizado();
+
+      setTimeout(() => setMensajeGuardado(null), 3000);
+    } catch (err: unknown) {
+      alert((err as Error).message);
+    } finally {
+      setGuardando(false);
+    }
+  }
+
   if (!estudioId) return null;
 
   const sem = estudio
     ? (SEMAFORO_CONFIG[estudio.dictamen.semaforo] ?? SEMAFORO_CONFIG["riesgo_elevado"])
     : null;
+
+  const estConfig = ESTADO_CONFIG[estadoOperacion] ?? ESTADO_CONFIG.estudio_inicial;
 
   return (
     <>
@@ -123,12 +222,18 @@ export default function EstudioDetalleDrawer({ estudioId, onClose }: Props) {
 
       {/* Drawer */}
       <div className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-2xl bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50 shrink-0">
+        
+        {/* Header principal */}
+        <div className="flex items-center justify-between px-6 py-3.5 border-b border-slate-200 bg-slate-50 shrink-0">
           <div>
-            <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
-              <span>📋</span> Detalle del Estudio
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-black text-slate-800">
+                Expediente: {estudio?.input?.titularPrincipal.nombre || "Titular"}
+              </h3>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${estConfig.bg} ${estConfig.text} ${estConfig.border}`}>
+                {estConfig.icon} {estConfig.label}
+              </span>
+            </div>
             <p className="text-[10px] font-mono text-slate-400 mt-0.5 truncate max-w-xs">{estudioId}</p>
           </div>
           <div className="flex items-center gap-2">
@@ -154,14 +259,41 @@ export default function EstudioDetalleDrawer({ estudioId, onClose }: Props) {
           </div>
         </div>
 
+        {/* Pestañas superiores del Drawer */}
+        <div className="flex border-b border-slate-200 px-6 bg-white gap-4 text-xs font-bold">
+          <button
+            onClick={() => setTabActiva("seguimiento")}
+            className={`py-2.5 border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
+              tabActiva === "seguimiento"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            <span>🚀</span> Seguimiento y Proceso Hipotecario
+            <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded-full font-bold">
+              CRM
+            </span>
+          </button>
+          <button
+            onClick={() => setTabActiva("financiero")}
+            className={`py-2.5 border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
+              tabActiva === "financiero"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            <span>📊</span> Estudio Financiero y Cuotas
+          </button>
+        </div>
+
         {/* Contenido scrollable */}
-        <div className="overflow-y-auto flex-1 p-6 space-y-5">
+        <div className="overflow-y-auto flex-1 p-6 space-y-5 bg-slate-50/50">
 
           {/* Loading */}
           {loading && (
             <div className="py-20 flex flex-col items-center gap-3">
               <div className="w-8 h-8 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-              <span className="text-sm text-slate-400">Cargando estudio desde PostgreSQL…</span>
+              <span className="text-sm text-slate-400">Cargando expediente desde PostgreSQL…</span>
             </div>
           )}
 
@@ -172,9 +304,298 @@ export default function EstudioDetalleDrawer({ estudioId, onClose }: Props) {
             </div>
           )}
 
-          {/* Datos */}
-          {estudio && sem && (
-            <>
+          {/* ================= PESTAÑA: SEGUIMIENTO / PIPELINE ================= */}
+          {estudio && tabActiva === "seguimiento" && (
+            <div className="space-y-5 animate-in fade-in duration-200">
+              
+              {/* Stepper Visual de Etapas */}
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>📍</span> Pipeline del Préstamo Hipotecario
+                  </h4>
+                  <span className="text-[11px] font-bold text-slate-500">
+                    Haz clic en una etapa para cambiar de fase
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    "estudio_inicial",
+                    "documentacion",
+                    "analisis_riesgos",
+                    "preconcedida",
+                    "arras",
+                    "tasacion",
+                    "fein",
+                    "notaria",
+                    "formalizada",
+                  ].map((fase) => {
+                    const cfg = ESTADO_CONFIG[fase];
+                    const esActual = estadoOperacion === fase;
+                    return (
+                      <button
+                        key={fase}
+                        type="button"
+                        onClick={() => {
+                          setEstadoOperacion(fase as EstadoOperacion);
+                          handleGuardarSeguimiento({ estadoOperacion: fase as EstadoOperacion });
+                        }}
+                        className={`p-2 rounded-xl border text-left transition cursor-pointer flex items-center gap-2 ${
+                          esActual
+                            ? "bg-blue-600 text-white border-blue-600 shadow-xs ring-2 ring-blue-200"
+                            : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700"
+                        }`}
+                      >
+                        <span className="text-base">{cfg.icon}</span>
+                        <div className="truncate">
+                          <p className={`text-[11px] font-bold truncate ${esActual ? "text-white" : "text-slate-800"}`}>
+                            {cfg.label}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Formulario de Datos del Proceso en 2 columnas */}
+              <div className="grid grid-cols-2 gap-4">
+                
+                {/* 1. Banco y Gestor */}
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+                  <h5 className="text-[11px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>🏦</span> Entidad y Gestor
+                  </h5>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                      Banco seleccionado
+                    </label>
+                    <input
+                      type="text"
+                      list="bancos-list"
+                      placeholder="ej. BBVA, Santander..."
+                      value={banco}
+                      onChange={(e) => setBanco(e.target.value)}
+                      className="w-full text-xs font-bold border border-slate-300 rounded-xl px-2.5 py-1.5 outline-none focus:border-blue-500 bg-white"
+                    />
+                    <datalist id="bancos-list">
+                      {BANCOS_POPULARES.map((b) => (
+                        <option key={b} value={b} />
+                      ))}
+                    </datalist>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                      Asesor / Gestor asignado
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="ej. Laura Sánchez"
+                      value={gestor}
+                      onChange={(e) => setGestor(e.target.value)}
+                      className="w-full text-xs font-bold border border-slate-300 rounded-xl px-2.5 py-1.5 outline-none focus:border-blue-500 bg-white"
+                    />
+                  </div>
+                </div>
+
+                {/* 2. Contrato de Arras */}
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+                  <h5 className="text-[11px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>✍️</span> Contrato de Arras
+                  </h5>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                      Fecha límite de arras
+                    </label>
+                    <input
+                      type="date"
+                      value={fechaArras}
+                      onChange={(e) => setFechaArras(e.target.value)}
+                      className="w-full text-xs font-bold border border-slate-300 rounded-xl px-2.5 py-1.5 outline-none focus:border-blue-500 bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                      Importe de la señal / arras (€)
+                    </label>
+                    <input
+                      type="number"
+                      step={500}
+                      placeholder="ej. 15000"
+                      value={importeArras}
+                      onChange={(e) => setImporteArras(e.target.value)}
+                      className="w-full text-xs font-bold border border-slate-300 rounded-xl px-2.5 py-1.5 outline-none focus:border-blue-500 bg-white"
+                    />
+                  </div>
+                </div>
+
+                {/* 3. Tasación Oficial */}
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+                  <h5 className="text-[11px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>📐</span> Tasación Inmobiliaria
+                  </h5>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                      Sociedad tasadora
+                    </label>
+                    <input
+                      type="text"
+                      list="tasadoras-list"
+                      placeholder="ej. Tinsa, ST..."
+                      value={tasadora}
+                      onChange={(e) => setTasadora(e.target.value)}
+                      className="w-full text-xs font-bold border border-slate-300 rounded-xl px-2.5 py-1.5 outline-none focus:border-blue-500 bg-white"
+                    />
+                    <datalist id="tasadoras-list">
+                      {TASADORAS_POPULARES.map((t) => (
+                        <option key={t} value={t} />
+                      ))}
+                    </datalist>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                      Valor tasación certificado (€)
+                    </label>
+                    <input
+                      type="number"
+                      step={1000}
+                      placeholder="ej. 260000"
+                      value={valorTasacion}
+                      onChange={(e) => setValorTasacion(e.target.value)}
+                      className="w-full text-xs font-bold border border-slate-300 rounded-xl px-2.5 py-1.5 outline-none focus:border-blue-500 bg-white"
+                    />
+                  </div>
+                </div>
+
+                {/* 4. Notaría y Escrituras */}
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+                  <h5 className="text-[11px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>🏛️</span> Notaría y Firma
+                  </h5>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                      Notaría designada
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="ej. Notaría García Martínez"
+                      value={notaria}
+                      onChange={(e) => setNotaria(e.target.value)}
+                      className="w-full text-xs font-bold border border-slate-300 rounded-xl px-2.5 py-1.5 outline-none focus:border-blue-500 bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                      Fecha y hora prevista
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={fechaNotaria}
+                      onChange={(e) => setFechaNotaria(e.target.value)}
+                      className="w-full text-xs font-bold border border-slate-300 rounded-xl px-2.5 py-1.5 outline-none focus:border-blue-500 bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Botón Guardar Cambios Generales */}
+              <div className="flex items-center justify-between bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
+                <div>
+                  {mensajeGuardado && (
+                    <span className="text-xs font-bold text-emerald-600 animate-in fade-in">
+                      {mensajeGuardado}
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleGuardarSeguimiento()}
+                  disabled={guardando}
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {guardando ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Guardando…
+                    </>
+                  ) : (
+                    <>
+                      <span>💾</span> Guardar Datos del Expediente
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Bitácora de Notas y Seguimiento */}
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+                <h5 className="text-[11px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <span>📝</span> Bitácora de Seguimiento y Notas del Gestor
+                </h5>
+
+                {/* Formulario para añadir nueva nota */}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Escribe una actualización (ej. Cliente aportó últimas nóminas, tasación enviada)..."
+                    value={nuevaNota}
+                    onChange={(e) => setNuevaNota(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && nuevaNota.trim()) {
+                        handleGuardarSeguimiento({ nuevaNota: nuevaNota.trim() });
+                      }
+                    }}
+                    className="flex-1 text-xs font-semibold border border-slate-300 rounded-xl px-3 py-2 outline-none focus:border-blue-500 bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (nuevaNota.trim()) {
+                        handleGuardarSeguimiento({ nuevaNota: nuevaNota.trim() });
+                      }
+                    }}
+                    disabled={!nuevaNota.trim() || guardando}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl transition cursor-pointer disabled:opacity-40"
+                  >
+                    + Añadir Nota
+                  </button>
+                </div>
+
+                {/* Lista de notas cronológica */}
+                <div className="space-y-2 pt-2">
+                  {(estudio.seguimiento?.notasSeguimiento ?? []).length === 0 ? (
+                    <p className="text-xs text-slate-400 italic text-center py-4">
+                      Aún no hay notas registradas en este expediente.
+                    </p>
+                  ) : (
+                    <div className="space-y-2 max-h-56 overflow-y-auto">
+                      {(estudio.seguimiento?.notasSeguimiento ?? [])
+                        .slice()
+                        .reverse()
+                        .map((nota, idx) => (
+                          <div
+                            key={idx}
+                            className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-800 flex items-start gap-2"
+                          >
+                            <span className="text-blue-500 font-bold shrink-0 mt-0.5">•</span>
+                            <span className="flex-1 leading-relaxed">{nota}</span>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+            </div>
+          )}
+
+          {/* ================= PESTAÑA: ESTUDIO FINANCIERO ================= */}
+          {estudio && sem && tabActiva === "financiero" && (
+            <div className="space-y-5 animate-in fade-in duration-200">
               {/* Semáforo */}
               <div className={`rounded-2xl border p-4 ${sem.bg} ${sem.border}`}>
                 <div className="flex items-center gap-3">
@@ -340,8 +761,9 @@ export default function EstudioDetalleDrawer({ estudioId, onClose }: Props) {
                   </div>
                 </div>
               )}
-            </>
+            </div>
           )}
+
         </div>
       </div>
     </>

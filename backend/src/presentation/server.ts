@@ -251,7 +251,7 @@ function readBody(req: http.IncomingMessage): Promise<string> {
 
 const server = http.createServer((req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   if (req.method === "OPTIONS") {
@@ -440,6 +440,30 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // PATCH /api/v1/estudios/:id/seguimiento
+  const seguimientoMatch = urlPath.match(/^\/api\/v1\/estudios\/([^/]+)\/seguimiento$/);
+  if (req.method === "PATCH" && seguimientoMatch) {
+    (async () => {
+      if (!bdDisponible) {
+        res.writeHead(503, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Base de datos no disponible" }));
+        return;
+      }
+      try {
+        const id = seguimientoMatch[1]!;
+        const rawBody = await readBody(req);
+        const data = rawBody ? JSON.parse(rawBody) : {};
+        await estudioRepository.actualizarSeguimiento(id, data);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: true, message: "Seguimiento actualizado con éxito" }));
+      } catch (err: unknown) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: (err as Error).message }));
+      }
+    })();
+    return;
+  }
+
   // GET /api/v1/estudios/:id
   const estudioIdMatch = urlPath.match(/^\/api\/v1\/estudios\/([^/]+)$/);
   if (req.method === "GET" && estudioIdMatch) {
@@ -451,14 +475,24 @@ const server = http.createServer((req, res) => {
       }
       try {
         const id = estudioIdMatch[1]!;
-        const estudio = await estudioRepository.buscarPorId(id);
-        if (!estudio) {
+        const estudioCompleto = await estudioRepository.buscarCompletoPorId(id);
+        if (!estudioCompleto) {
           res.writeHead(404, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: "Estudio no encontrado" }));
           return;
         }
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify(estudio, null, 2));
+        res.end(
+          JSON.stringify(
+            {
+              ...estudioCompleto.output,
+              input: estudioCompleto.input,
+              seguimiento: estudioCompleto.seguimiento,
+            },
+            null,
+            2
+          )
+        );
       } catch (err: unknown) {
         res.writeHead(500, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: (err as Error).message }));

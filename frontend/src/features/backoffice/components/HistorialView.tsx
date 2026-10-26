@@ -34,6 +34,22 @@ const SEMAFORO_CONFIG: Record<
   },
 };
 
+export const ESTADO_CONFIG: Record<
+  string,
+  { label: string; icon: string; bg: string; text: string; border: string }
+> = {
+  estudio_inicial: { label: "Estudio inicial", icon: "📊", bg: "bg-slate-100", text: "text-slate-700", border: "border-slate-200" },
+  documentacion: { label: "Documentación", icon: "📁", bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" },
+  analisis_riesgos: { label: "En riesgos", icon: "⚖️", bg: "bg-indigo-50", text: "text-indigo-700", border: "border-indigo-200" },
+  preconcedida: { label: "Preconcedida", icon: "🎉", bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
+  arras: { label: "Firma de arras", icon: "✍️", bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" },
+  tasacion: { label: "Tasación", icon: "📐", bg: "bg-cyan-50", text: "text-cyan-700", border: "border-cyan-200" },
+  fein: { label: "FEIN vinculante", icon: "📜", bg: "bg-violet-50", text: "text-violet-700", border: "border-violet-200" },
+  notaria: { label: "Firma Notaría", icon: "🏛️", bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-200" },
+  formalizada: { label: "Formalizada", icon: "🔑", bg: "bg-teal-50", text: "text-teal-700", border: "border-teal-200" },
+  cancelada: { label: "Desistida", icon: "✖️", bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200" },
+};
+
 const CCAA_LABELS: Record<string, string> = {
   MD: "Madrid",
   CT: "Cataluña",
@@ -82,6 +98,7 @@ export default function HistorialView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filtroSemaforo, setFiltroSemaforo] = useState<string>("todos");
+  const [filtroEstado, setFiltroEstado] = useState<string>("todos");
   const [busqueda, setBusqueda] = useState<string>("");
   const [fechaDesde, setFechaDesde] = useState<string>("");
   const [fechaHasta, setFechaHasta] = useState<string>("");
@@ -95,6 +112,7 @@ export default function HistorialView() {
       const data = await listarEstudios(PAGE_SIZE, pagina * PAGE_SIZE, {
         search: busqueda.trim() || undefined,
         semaforo: filtroSemaforo,
+        estadoOperacion: filtroEstado,
         desde: fechaDesde || undefined,
         hasta: fechaHasta || undefined,
       });
@@ -105,12 +123,12 @@ export default function HistorialView() {
     } finally {
       setLoading(false);
     }
-  }, [pagina, busqueda, filtroSemaforo, fechaDesde, fechaHasta]);
+  }, [pagina, busqueda, filtroSemaforo, filtroEstado, fechaDesde, fechaHasta]);
 
   useEffect(() => {
     // Si cambia un filtro de búsqueda, volvemos a la primera página
     setPagina(0);
-  }, [busqueda, filtroSemaforo, fechaDesde, fechaHasta]);
+  }, [busqueda, filtroSemaforo, filtroEstado, fechaDesde, fechaHasta]);
 
   useEffect(() => {
     cargarEstudios();
@@ -119,6 +137,7 @@ export default function HistorialView() {
   function limpiarFiltros() {
     setBusqueda("");
     setFiltroSemaforo("todos");
+    setFiltroEstado("todos");
     setFechaDesde("");
     setFechaHasta("");
     setPagina(0);
@@ -127,6 +146,7 @@ export default function HistorialView() {
   const hayFiltrosActivos =
     busqueda.trim() !== "" ||
     filtroSemaforo !== "todos" ||
+    filtroEstado !== "todos" ||
     fechaDesde !== "" ||
     fechaHasta !== "";
 
@@ -157,6 +177,7 @@ export default function HistorialView() {
       <EstudioDetalleDrawer
         estudioId={estudioSeleccionado}
         onClose={() => setEstudioSeleccionado(null)}
+        onActualizado={cargarEstudios}
       />
 
       {/* ── Cabecera de la sección ── */}
@@ -242,6 +263,23 @@ export default function HistorialView() {
             </button>
           ))}
         </div>
+
+        {/* Filtro por Fase del Pipeline */}
+        <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-100">
+          <span className="text-[11px] text-slate-500 font-semibold mr-1">Fase Pipeline:</span>
+          <select
+            value={filtroEstado}
+            onChange={(e) => setFiltroEstado(e.target.value)}
+            className="text-xs font-bold border border-slate-200 rounded-lg px-2.5 py-1 bg-white text-slate-700 outline-none cursor-pointer"
+          >
+            <option value="todos">Todas las fases del proceso</option>
+            {Object.entries(ESTADO_CONFIG).map(([k, cfg]) => (
+              <option key={k} value={k}>
+                {cfg.icon} {cfg.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* ── Error ── */}
@@ -289,6 +327,7 @@ export default function HistorialView() {
                   <tr>
                     <th className="px-4 py-3 text-left font-bold whitespace-nowrap">Fecha / ID</th>
                     <th className="px-4 py-3 text-left font-bold whitespace-nowrap">Solicitante</th>
+                    <th className="px-4 py-3 text-left font-bold whitespace-nowrap">Fase Proceso</th>
                     <th className="px-4 py-3 text-left font-bold whitespace-nowrap">Dictamen</th>
                     <th className="px-4 py-3 text-left font-bold whitespace-nowrap">Comunidad</th>
                     <th className="px-4 py-3 text-left font-bold whitespace-nowrap">Tipo</th>
@@ -307,6 +346,7 @@ export default function HistorialView() {
                       icon: "❓",
                       label: "Desconocido",
                     };
+                    const estConfig = ESTADO_CONFIG[e.estadoOperacion ?? "estudio_inicial"] ?? ESTADO_CONFIG.estudio_inicial;
                     const isDescargando = descargando === e.id;
 
                     return (
@@ -337,6 +377,16 @@ export default function HistorialView() {
                               <span>{e.cotitularNombre}</span>
                             </div>
                           )}
+                        </td>
+
+                        {/* Fase de Operación / Pipeline */}
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2 py-0.5 rounded-lg border whitespace-nowrap ${estConfig.bg} ${estConfig.text} ${estConfig.border}`}
+                          >
+                            <span className="text-xs">{estConfig.icon}</span>
+                            <span>{estConfig.label}</span>
+                          </span>
                         </td>
 
                         {/* Dictamen / Semáforo */}

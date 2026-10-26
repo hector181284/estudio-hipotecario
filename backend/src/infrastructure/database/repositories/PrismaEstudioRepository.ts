@@ -1,5 +1,5 @@
 import { prisma } from "../prisma-client.js";
-import type { IEstudioRepository, EstudioResumen, EstudioCompletoPersistido, FiltrosEstudio } from "../../../core/domain/ports/IEstudioRepository.js";
+import type { IEstudioRepository, EstudioResumen, EstudioCompletoPersistido, FiltrosEstudio, DatosSeguimientoDto, SeguimientoCompleto } from "../../../core/domain/ports/IEstudioRepository.js";
 import type { SimularEstudioInputDto, SimularEstudioOutputDto } from "../../../core/application/use-cases/SimularEstudioHipotecarioUseCase.js";
 import { CalculadoraAmortizacionFrancesa } from "../../../core/domain/services/CalculadoraAmortizacionFrancesa.js";
 import { Money } from "../../../core/domain/value-objects/Money.js";
@@ -161,7 +161,55 @@ export class PrismaEstudioRepository implements IEstudioRepository {
       },
     };
 
-    return { input, output };
+    const seguimiento: SeguimientoCompleto = {
+      estadoOperacion: estudio.estadoOperacion ?? "estudio_inicial",
+      bancoSeleccionado: estudio.bancoSeleccionado,
+      gestorAsignado: estudio.gestorAsignado,
+      fechaLimiteArras: estudio.fechaLimiteArras,
+      importeArras: estudio.importeArras ? estudio.importeArras.toNumber() : null,
+      tasadora: estudio.tasadora,
+      valorTasacionReal: estudio.valorTasacionReal ? estudio.valorTasacionReal.toNumber() : null,
+      notaria: estudio.notaria,
+      fechaFirmaNotaria: estudio.fechaFirmaNotaria,
+      notasSeguimiento: estudio.notasSeguimiento ?? [],
+    };
+
+    return { input, output, seguimiento };
+  }
+
+  async actualizarSeguimiento(id: string, datos: DatosSeguimientoDto): Promise<void> {
+    const dataToUpdate: any = {};
+
+    if (datos.estadoOperacion !== undefined) dataToUpdate.estadoOperacion = datos.estadoOperacion;
+    if (datos.bancoSeleccionado !== undefined) dataToUpdate.bancoSeleccionado = datos.bancoSeleccionado;
+    if (datos.gestorAsignado !== undefined) dataToUpdate.gestorAsignado = datos.gestorAsignado;
+    if (datos.fechaLimiteArras !== undefined) {
+      dataToUpdate.fechaLimiteArras = datos.fechaLimiteArras ? new Date(datos.fechaLimiteArras) : null;
+    }
+    if (datos.importeArras !== undefined) {
+      dataToUpdate.importeArras = datos.importeArras != null ? datos.importeArras : null;
+    }
+    if (datos.tasadora !== undefined) dataToUpdate.tasadora = datos.tasadora;
+    if (datos.valorTasacionReal !== undefined) {
+      dataToUpdate.valorTasacionReal = datos.valorTasacionReal != null ? datos.valorTasacionReal : null;
+    }
+    if (datos.notaria !== undefined) dataToUpdate.notaria = datos.notaria;
+    if (datos.fechaFirmaNotaria !== undefined) {
+      dataToUpdate.fechaFirmaNotaria = datos.fechaFirmaNotaria ? new Date(datos.fechaFirmaNotaria) : null;
+    }
+
+    if (datos.nuevaNota && datos.nuevaNota.trim()) {
+      const fechaNota = new Date().toISOString();
+      const notaFormateada = `[${fechaNota}] ${datos.nuevaNota.trim()}`;
+      dataToUpdate.notasSeguimiento = {
+        push: notaFormateada,
+      };
+    }
+
+    await prisma.estudioHipotecario.update({
+      where: { id },
+      data: dataToUpdate,
+    });
   }
 
   private construirWhere(filtros?: FiltrosEstudio) {
@@ -171,6 +219,10 @@ export class PrismaEstudioRepository implements IEstudioRepository {
 
     if (filtros.semaforo && filtros.semaforo !== "todos") {
       where.semaforo = filtros.semaforo;
+    }
+
+    if (filtros.estadoOperacion && filtros.estadoOperacion !== "todos") {
+      where.estadoOperacion = filtros.estadoOperacion;
     }
 
     if (filtros.desde || filtros.hasta) {
@@ -210,6 +262,7 @@ export class PrismaEstudioRepository implements IEstudioRepository {
         comunidadAutonoma: true,
         plazoAnios: true,
         tipoVivienda: true,
+        estadoOperacion: true,
         participantes: {
           select: {
             nombre: true,
@@ -233,6 +286,7 @@ export class PrismaEstudioRepository implements IEstudioRepository {
         tipoVivienda: e.tipoVivienda,
         titularNombre: titular?.nombre,
         cotitularNombre: cotitular?.nombre,
+        estadoOperacion: e.estadoOperacion ?? "estudio_inicial",
       };
     });
   }

@@ -109,7 +109,50 @@ export async function actualizarTributos(tributos: TablaTributosDto[]): Promise<
   if (!res.ok) throw new Error("Error al actualizar tablas tributarias");
 }
 
-// ── Historial de Estudios ──────────────────────────────────────────────────────
+// ── Historial y Seguimiento del Ciclo de Vida ────────────────────────────────
+
+export type EstadoOperacion =
+  | "estudio_inicial"
+  | "documentacion"
+  | "analisis_riesgos"
+  | "preconcedida"
+  | "arras"
+  | "tasacion"
+  | "fein"
+  | "notaria"
+  | "formalizada"
+  | "cancelada";
+
+export interface SeguimientoCompleto {
+  estadoOperacion: EstadoOperacion;
+  bancoSeleccionado?: string | null;
+  gestorAsignado?: string | null;
+  fechaLimiteArras?: string | null;
+  importeArras?: number | null;
+  tasadora?: string | null;
+  valorTasacionReal?: number | null;
+  notaria?: string | null;
+  fechaFirmaNotaria?: string | null;
+  notasSeguimiento: string[];
+}
+
+export interface DatosSeguimientoDto {
+  estadoOperacion?: EstadoOperacion;
+  bancoSeleccionado?: string;
+  gestorAsignado?: string;
+  fechaLimiteArras?: string;
+  importeArras?: number;
+  tasadora?: string;
+  valorTasacionReal?: number;
+  notaria?: string;
+  fechaFirmaNotaria?: string;
+  nuevaNota?: string;
+}
+
+export interface EstudioCompletoResponse extends SimularEstudioOutputDto {
+  input?: SimularEstudioInputDto;
+  seguimiento?: SeguimientoCompleto;
+}
 
 export interface EstudioResumenDto {
   id: string;
@@ -122,11 +165,13 @@ export interface EstudioResumenDto {
   tipoVivienda: string;
   titularNombre?: string;
   cotitularNombre?: string;
+  estadoOperacion?: EstadoOperacion;
 }
 
 export interface HistorialFiltros {
   search?: string;
   semaforo?: string;
+  estadoOperacion?: string;
   desde?: string;
   hasta?: string;
 }
@@ -150,6 +195,7 @@ export async function listarEstudios(
 
   if (filtros?.search?.trim()) query.set("search", filtros.search.trim());
   if (filtros?.semaforo && filtros.semaforo !== "todos") query.set("semaforo", filtros.semaforo);
+  if (filtros?.estadoOperacion && filtros.estadoOperacion !== "todos") query.set("estadoOperacion", filtros.estadoOperacion);
   if (filtros?.desde) query.set("desde", filtros.desde);
   if (filtros?.hasta) query.set("hasta", filtros.hasta);
 
@@ -158,13 +204,29 @@ export async function listarEstudios(
   return res.json();
 }
 
-export async function obtenerEstudio(id: string): Promise<SimularEstudioOutputDto> {
+export async function obtenerEstudio(id: string): Promise<EstudioCompletoResponse> {
   const res = await fetch(`${API_URL}/api/v1/estudios/${id}`);
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: "Error al obtener el estudio" }));
     throw new Error(err.error ?? "Error al obtener el estudio");
   }
-  return res.json() as Promise<SimularEstudioOutputDto>;
+  return res.json() as Promise<EstudioCompletoResponse>;
+}
+
+export async function actualizarSeguimientoEstudio(
+  id: string,
+  datos: DatosSeguimientoDto
+): Promise<void> {
+  const res = await fetch(`${API_URL}/api/v1/estudios/${id}/seguimiento`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(datos),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Error al actualizar seguimiento" }));
+    throw new Error(err.error ?? "Error al actualizar el seguimiento del expediente");
+  }
 }
 
 export async function descargarPdfEstudio(id: string): Promise<Blob> {
