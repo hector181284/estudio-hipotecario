@@ -50,6 +50,7 @@ model EstudioHipotecario {
   notaria             String?
   fechaFirmaNotaria   DateTime?
   notasSeguimiento    String[]  @default([])
+  datosExpedienteJson String?   @db.Text
 
   participantes       Participante[]
 }

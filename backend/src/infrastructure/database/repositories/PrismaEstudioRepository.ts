@@ -172,6 +172,7 @@ export class PrismaEstudioRepository implements IEstudioRepository {
       notaria: estudio.notaria,
       fechaFirmaNotaria: estudio.fechaFirmaNotaria,
       notasSeguimiento: estudio.notasSeguimiento ?? [],
+      datosExpedienteJson: estudio.datosExpedienteJson ?? null,
     };
 
     return { input, output, seguimiento };
@@ -196,6 +197,9 @@ export class PrismaEstudioRepository implements IEstudioRepository {
     if (datos.notaria !== undefined) dataToUpdate.notaria = datos.notaria;
     if (datos.fechaFirmaNotaria !== undefined) {
       dataToUpdate.fechaFirmaNotaria = datos.fechaFirmaNotaria ? new Date(datos.fechaFirmaNotaria) : null;
+    }
+    if (datos.datosExpedienteJson !== undefined) {
+      dataToUpdate.datosExpedienteJson = datos.datosExpedienteJson;
     }
 
     if (datos.nuevaNota && datos.nuevaNota.trim()) {

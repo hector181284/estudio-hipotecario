@@ -25,6 +25,7 @@ export interface DatosSeguimientoDto {
   notaria?: string;
   fechaFirmaNotaria?: string;
   nuevaNota?: string;
+  datosExpedienteJson?: string | null;
 }
 
 export interface SeguimientoCompleto {
@@ -38,6 +39,7 @@ export interface SeguimientoCompleto {
   notaria?: string | null;
   fechaFirmaNotaria?: Date | null;
   notasSeguimiento: string[];
+  datosExpedienteJson?: string | null;
 }
 
 export interface FiltrosEstudio {

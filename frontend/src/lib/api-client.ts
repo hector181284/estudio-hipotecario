@@ -134,6 +134,170 @@ export interface SeguimientoCompleto {
   notaria?: string | null;
   fechaFirmaNotaria?: string | null;
   notasSeguimiento: string[];
+  datosExpedienteJson?: string | null;
+}
+
+export interface ExpedienteHipotecarioEspanol {
+  documentacion: {
+    dniAportado: boolean;
+    dniCaducidad?: string;
+    ultimasTresNominas: boolean;
+    declaracionRentaIrpf: boolean;
+    vidaLaboralActualizada: boolean;
+    extractosBancarios: boolean;
+    recibosPrestamos: boolean;
+    informeCirbe: boolean;
+    justificanteFondosPropios: boolean;
+    modelosTrimestralesIvaIrpf?: boolean;
+    estadoScoring: "pendiente" | "favorable" | "condicionado" | "denegado";
+    bancoPreAprobacion?: string;
+    importePreAprobado?: number;
+    validezPreAprobacion?: string;
+  };
+  inmuebleYArras: {
+    referenciaCatastral?: string;
+    notaSimpleSolicitada: boolean;
+    fechaNotaSimple?: string;
+    registroPropiedadNumero?: string;
+    numeroFincaRegistral?: string;
+    cargasExistentes: "ninguna" | "hipoteca_vendedor" | "embargo" | "afeccion_fiscal";
+    importeCargaPendiente?: number;
+    bancoCargaAnterior?: string;
+    certificadoEficienciaEnergetica: boolean;
+    cedulaHabitabilidadLicenciaOcupacion: boolean;
+    certificadoComunidadAlCorriente: boolean;
+    ultimoReciboIbiPagado: boolean;
+    tipoContratoArras: "penitenciales_1454" | "confirmatorias" | "penales";
+    clausulaResolutoriaHipoteca: boolean;
+    importeArras?: number;
+    fechaFirmaArras?: string;
+    fechaLimiteEscrituracion?: string;
+    datosVendedorInmobiliaria?: string;
+    contactoVendedor?: string;
+  };
+  tasacion: {
+    sociedadTasadora?: string;
+    fechaEncargo?: string;
+    fechaVisita?: string;
+    costeTasacion?: number;
+    quienPagaTasacion: "comprador" | "banco" | "vendedor";
+    valorTasacionOficial?: number;
+    ltvSobreTasacion?: number;
+    estadoTasacion: "pendiente" | "encargada" | "visita_realizada" | "informe_emitido" | "conforme";
+    advertenciasOCondicionantes?: string;
+  };
+  aprobacionFein: {
+    bancoDefinitivo?: string;
+    fechaAprobacionRiesgos?: string;
+    fechaEmisionFein?: string;
+    fechaRecepcionCliente?: string;
+    diasValidezOferta?: number;
+    capitalConcedido?: number;
+    plazoAniosAprobado?: number;
+    modalidadTipo: "fijo" | "variable" | "mixto";
+    tinNominalBonificado?: number;
+    tinSinBonificar?: number;
+    taeFinanciera?: number;
+    cuotaConBonificaciones?: number;
+    cuotaSinBonificaciones?: number;
+    bonificacionesContratadas: {
+      nomina: boolean;
+      seguroHogar: boolean;
+      seguroVida: boolean;
+      planPensiones: boolean;
+      alarma: boolean;
+    };
+    comisionAperturaPct?: number;
+    compensacionAmortizacionAnticipada?: string;
+  };
+  notariaYActa: {
+    notariaNombre?: string;
+    notarioTitular?: string;
+    localidadNotaria?: string;
+    telefonoNotaria?: string;
+    plataformaEnvio: "ancert" | "signe" | "otra";
+    fechaSubidaPlataforma?: string;
+    fechaHoraActaPrevia?: string;
+    diasMinimosLcci: 10 | 14;
+    cumplePlazoLegalLcci: boolean;
+    actaPreviaFavorable: boolean;
+    gestoriaBancaria?: string;
+    gestorTramitador?: string;
+    provisionFondosSolicitada?: number;
+    fechaIngresoProvision?: string;
+  };
+  firmaYRegistro: {
+    fechaHoraFirmaEscritura?: string;
+    numeroProtocoloNotarial?: string;
+    medioPagoPrecio: "cheque_bancario" | "transferencia_omf_bde";
+    cancelacionEconomicaHipotecaAnterior: boolean;
+    importeCancelacionAnterior?: number;
+    entregaLlavesRealizada: boolean;
+    impuestoLiquidado: "itp_modelo_600" | "iva_ajd_modelo_601";
+    fechaLiquidacionImpuesto?: string;
+    fechaPresentacionRegistro?: string;
+    registroPropiedadFinal?: string;
+    fincaRegistralDefinitiva?: string;
+    remanenteProvisionDevuelto?: number;
+    expedienteCompletado: boolean;
+  };
+}
+
+export function crearExpedienteEspanolPorDefecto(precio = 200000, ccaa = "MD"): ExpedienteHipotecarioEspanol {
+  return {
+    documentacion: {
+      dniAportado: false,
+      ultimasTresNominas: false,
+      declaracionRentaIrpf: false,
+      vidaLaboralActualizada: false,
+      extractosBancarios: false,
+      recibosPrestamos: false,
+      informeCirbe: false,
+      justificanteFondosPropios: false,
+      estadoScoring: "pendiente",
+    },
+    inmuebleYArras: {
+      notaSimpleSolicitada: false,
+      cargasExistentes: "ninguna",
+      certificadoEficienciaEnergetica: false,
+      cedulaHabitabilidadLicenciaOcupacion: false,
+      certificadoComunidadAlCorriente: false,
+      ultimoReciboIbiPagado: false,
+      tipoContratoArras: "penitenciales_1454",
+      clausulaResolutoriaHipoteca: true,
+      importeArras: Math.round(precio * 0.10),
+    },
+    tasacion: {
+      quienPagaTasacion: "comprador",
+      costeTasacion: 380,
+      estadoTasacion: "pendiente",
+    },
+    aprobacionFein: {
+      modalidadTipo: "fijo",
+      diasValidezOferta: 30,
+      comisionAperturaPct: 0,
+      bonificacionesContratadas: {
+        nomina: true,
+        seguroHogar: true,
+        seguroVida: false,
+        planPensiones: false,
+        alarma: false,
+      },
+    },
+    notariaYActa: {
+      plataformaEnvio: "ancert",
+      diasMinimosLcci: ccaa === "CT" ? 14 : 10,
+      cumplePlazoLegalLcci: false,
+      actaPreviaFavorable: false,
+    },
+    firmaYRegistro: {
+      medioPagoPrecio: "cheque_bancario",
+      cancelacionEconomicaHipotecaAnterior: false,
+      entregaLlavesRealizada: false,
+      impuestoLiquidado: "itp_modelo_600",
+      expedienteCompletado: false,
+    },
+  };
 }
 
 export interface DatosSeguimientoDto {
@@ -147,6 +311,7 @@ export interface DatosSeguimientoDto {
   notaria?: string;
   fechaFirmaNotaria?: string;
   nuevaNota?: string;
+  datosExpedienteJson?: string;
 }
 
 export interface EstudioCompletoResponse extends SimularEstudioOutputDto {
