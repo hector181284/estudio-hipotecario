@@ -16,6 +16,7 @@ import {
 } from "recharts";
 import { useMortgageStore } from "@/stores/mortgage-simulator.store";
 import { descargarInformePdf } from "@/lib/api-client";
+import { calcularGastosCompraventa } from "@/lib/calculos-fiscales";
 import type { ViabilityStatus } from "@/types/mortgage";
 
 const SEMAFORO_CONFIG: Record<
@@ -59,6 +60,19 @@ export default function SimulationCanvas() {
   const [leadTelefono, setLeadTelefono] = useState("");
   const [descargandoPdf, setDescargandoPdf] = useState(false);
   const [errorDescarga, setErrorDescarga] = useState<string | null>(null);
+
+  const fijarPorcentajeFinanciacion = (pct: number) => {
+    const gastos =
+      result?.dictamen.totalGastosCompraventa ??
+      calcularGastosCompraventa(
+        params.precioInmueble,
+        params.tipoVivienda,
+        params.comunidadAutonoma
+      );
+    const entrada = Math.max(0, Math.round(params.precioInmueble * (1 - pct / 100)));
+    const nuevoAhorro = Math.round(entrada + gastos);
+    setParam("ahorrosAportados", nuevoAhorro);
+  };
 
   async function handleDescargarPdf(e: React.FormEvent) {
     e.preventDefault();
@@ -219,60 +233,147 @@ export default function SimulationCanvas() {
         </div>
 
         {/* ── Panel de Ajuste Rápido integrado en el banner ── */}
-        <div className="px-6 pb-5 grid grid-cols-2 gap-x-6 gap-y-1">
-          {/* Precio del Inmueble */}
-          <div>
-            <div className="flex justify-between items-baseline mb-1">
-              <label className="text-[11px] font-bold text-slate-600">🏠 Precio del Inmueble</label>
-              <span className="text-sm font-black text-blue-700">
-                {params.precioInmueble.toLocaleString("es-ES")} €
-              </span>
+        <div className="px-6 pb-5 space-y-3">
+          {/* Selector interactivo de % Financiación Bancaria */}
+          <div className="bg-white/85 backdrop-blur-xs p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-base">🏦</span>
+                <div>
+                  <span className="text-xs font-bold text-slate-800">
+                    Financiación Bancaria Solicitada (LTV)
+                  </span>
+                  <span className="text-[10px] text-slate-500 block">
+                    Escoge qué % financia el banco para ver el impacto inmediato en cuota y dictamen
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-blue-700 bg-blue-50 px-2.5 py-1 rounded-xl border border-blue-200">
+                  {dictamen.ratioLtv.toFixed(1)}% financiado ({dictamen.capitalPrestadoFormateado})
+                </span>
+              </div>
             </div>
-            <input
-              type="range"
-              min={50000}
-              max={1500000}
-              step={5000}
-              value={params.precioInmueble}
-              onChange={(e) => setParam("precioInmueble", Number(e.target.value))}
-              className="w-full h-2 bg-white/60 rounded-full appearance-none cursor-pointer accent-blue-600"
-            />
-            <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
-              <span>50.000 €</span>
-              <span>1.500.000 €</span>
+
+            {/* Opciones rápidas de % de Financiación */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+              {[
+                { pct: 70, label: "70%", desc: "Conservador", badge: "Mínimo riesgo" },
+                { pct: 80, label: "80%", desc: "Estándar BdE", badge: "Recomendado" },
+                { pct: 90, label: "90%", desc: "Aval ICO / Jóvenes", badge: "Aval ICO" },
+                { pct: 95, label: "95%", desc: "Financiación Alta", badge: "Convenios" },
+                { pct: 100, label: "100%", desc: "100% Compra", badge: "Solo gastos" },
+              ].map((opc) => {
+                const isActive = Math.round(dictamen.ratioLtv) === opc.pct;
+                return (
+                  <button
+                    key={opc.pct}
+                    type="button"
+                    onClick={() => fijarPorcentajeFinanciacion(opc.pct)}
+                    className={`p-2 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between ${
+                      isActive
+                        ? "bg-blue-600 border-blue-600 text-white shadow-xs scale-[1.02]"
+                        : "bg-white/90 border-slate-200 text-slate-700 hover:bg-white hover:border-slate-300"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-black text-xs">{opc.label}</span>
+                      <span className={`text-[8px] px-1.5 py-0.5 rounded font-bold ${
+                        isActive ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                      }`}>
+                        {opc.badge}
+                      </span>
+                    </div>
+                    <span className={`text-[9px] mt-0.5 truncate ${isActive ? "text-blue-100" : "text-slate-500"}`}>
+                      {opc.desc}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Control deslizante de % Financiación */}
+            <div className="pt-0.5">
+              <div className="flex justify-between items-center text-[10px] text-slate-500 mb-1">
+                <span>Ajuste personalizado de financiación:</span>
+                <span className="font-bold text-slate-800">{Math.round(dictamen.ratioLtv)}%</span>
+              </div>
+              <input
+                type="range"
+                min={50}
+                max={100}
+                step={1}
+                value={Math.min(100, Math.max(50, Math.round(dictamen.ratioLtv)))}
+                onChange={(e) => fijarPorcentajeFinanciacion(Number(e.target.value))}
+                className="w-full h-1.5 bg-slate-200 rounded-full appearance-none cursor-pointer accent-blue-600"
+              />
+              <div className="flex justify-between text-[9px] text-slate-400 mt-0.5">
+                <span>50%</span>
+                <span>70%</span>
+                <span>80% (Estándar)</span>
+                <span>90% (ICO)</span>
+                <span>95% (Alta)</span>
+                <span>100%</span>
+              </div>
             </div>
           </div>
 
-          {/* Ahorros Aportados */}
-          <div>
-            <div className="flex justify-between items-baseline mb-1">
-              <label className="text-[11px] font-bold text-slate-600">💰 Ahorros Aportados</label>
-              <span className="text-sm font-black text-emerald-700">
-                {params.ahorrosAportados.toLocaleString("es-ES")} €
-              </span>
+          {/* Ajuste fino de Precio y Ahorros */}
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1">
+            {/* Precio del Inmueble */}
+            <div>
+              <div className="flex justify-between items-baseline mb-1">
+                <label className="text-[11px] font-bold text-slate-600">🏠 Precio del Inmueble</label>
+                <span className="text-sm font-black text-blue-700">
+                  {params.precioInmueble.toLocaleString("es-ES")} €
+                </span>
+              </div>
+              <input
+                type="range"
+                min={50000}
+                max={1500000}
+                step={5000}
+                value={params.precioInmueble}
+                onChange={(e) => setParam("precioInmueble", Number(e.target.value))}
+                className="w-full h-2 bg-white/60 rounded-full appearance-none cursor-pointer accent-blue-600"
+              />
+              <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
+                <span>50.000 €</span>
+                <span>1.500.000 €</span>
+              </div>
             </div>
-            <input
-              type="range"
-              min={0}
-              max={Math.round(params.precioInmueble * 0.6)}
-              step={1000}
-              value={params.ahorrosAportados}
-              onChange={(e) => setParam("ahorrosAportados", Number(e.target.value))}
-              className="w-full h-2 bg-white/60 rounded-full appearance-none cursor-pointer accent-emerald-600"
-            />
-            <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
-              <span>0 €</span>
-              <span>{Math.round(params.precioInmueble * 0.6).toLocaleString("es-ES")} €</span>
-            </div>
-          </div>
 
-          {/* Indicador de recálculo */}
-          {isLoading && (
-            <div className="col-span-2 flex items-center gap-2 mt-1">
-              <div className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
-              <span className="text-[10px] text-blue-600 font-semibold">Recalculando dictamen…</span>
+            {/* Ahorros Aportados */}
+            <div>
+              <div className="flex justify-between items-baseline mb-1">
+                <label className="text-[11px] font-bold text-slate-600">💰 Ahorros Aportados</label>
+                <span className="text-sm font-black text-emerald-700">
+                  {params.ahorrosAportados.toLocaleString("es-ES")} €
+                </span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={Math.round(params.precioInmueble * 0.6)}
+                step={1000}
+                value={params.ahorrosAportados}
+                onChange={(e) => setParam("ahorrosAportados", Number(e.target.value))}
+                className="w-full h-2 bg-white/60 rounded-full appearance-none cursor-pointer accent-emerald-600"
+              />
+              <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
+                <span>0 €</span>
+                <span>{Math.round(params.precioInmueble * 0.6).toLocaleString("es-ES")} €</span>
+              </div>
             </div>
-          )}
+
+            {/* Indicador de recálculo */}
+            {isLoading && (
+              <div className="col-span-2 flex items-center gap-2 mt-1">
+                <div className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
+                <span className="text-[10px] text-blue-600 font-semibold">Recalculando dictamen…</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -313,6 +414,27 @@ export default function SimulationCanvas() {
                 <span>Préstamo: {dictamen.capitalPrestadoFormateado}</span>
                 <span>Máx: 80%</span>
               </p>
+
+              {/* Selector rápido dentro de la propia tarjeta LTV */}
+              <div className="pt-2 mt-2 border-t border-slate-100 flex items-center justify-between gap-1">
+                <span className="text-[10px] font-bold text-slate-400">Probar:</span>
+                <div className="flex gap-1">
+                  {[70, 80, 90, 95, 100].map((pct) => (
+                    <button
+                      key={pct}
+                      type="button"
+                      onClick={() => fijarPorcentajeFinanciacion(pct)}
+                      className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded cursor-pointer transition ${
+                        Math.round(dictamen.ratioLtv) === pct
+                          ? "bg-blue-600 text-white shadow-2xs"
+                          : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                      }`}
+                    >
+                      {pct}%
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             {/* DTI */}

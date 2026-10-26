@@ -3,6 +3,7 @@
 import React, { useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useMortgageStore } from "@/stores/mortgage-simulator.store";
+import { calcularGastosCompraventa, calcularAhorrosParaFinanciacion } from "@/lib/calculos-fiscales";
 import type {
   PropertyType,
   LoanPurpose,
@@ -259,59 +260,174 @@ export default function ChatPanel() {
           </div>
         )}
 
-        {/* ================= PASO 3: AHORROS DISPONIBLES ================= */}
-        {activeStep >= 3 && (
-          <div className="space-y-3 animate-in fade-in duration-300">
-            <div className="flex items-start gap-2.5 max-w-[92%]">
-              <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] shrink-0 font-bold">
-                IA
-              </div>
-              <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-xs p-3 shadow-xs text-xs text-slate-800">
-                <p>¿Qué cantidad de ahorros propios tienes previstos aportar para la operación?</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">Se destina a cubrir la entrada del 20% y los gastos de compraventa.</p>
-              </div>
-            </div>
+        {/* ================= PASO 3: AHORROS Y FINANCIACIÓN SOLICITADA ================= */}
+        {activeStep >= 3 && (() => {
+          const gastosEstimados = calcularGastosCompraventa(params.precioInmueble, params.tipoVivienda, params.comunidadAutonoma);
+          const fondosParaEntrada = Math.max(0, params.ahorrosAportados - gastosEstimados);
+          const prestamoEstimado = Math.max(0, params.precioInmueble - fondosParaEntrada);
+          const pctFinanciacionActual = params.precioInmueble > 0
+            ? Math.round((prestamoEstimado / params.precioInmueble) * 100)
+            : 80;
 
-            <div className="ml-8 space-y-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Ahorro aportado</span>
-                <span className="text-sm font-black text-blue-700 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100">
-                  {params.ahorrosAportados.toLocaleString("es-ES")} €
-                </span>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={Math.max(params.precioInmueble * 0.6, 150000)}
-                step={2500}
-                value={params.ahorrosAportados}
-                onChange={(e) => setParam("ahorrosAportados", Number(e.target.value))}
-                className="w-full h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-blue-600"
-              />
-              <div className="flex justify-between text-[10px] text-slate-400">
-                <span>0 €</span>
-                <span>{(params.precioInmueble * 0.3).toLocaleString("es-ES")} € (30% recomendado)</span>
-              </div>
+          const aplicarPorcentaje = (pct: number) => {
+            const calc = calcularAhorrosParaFinanciacion(
+              params.precioInmueble,
+              params.tipoVivienda,
+              params.comunidadAutonoma,
+              pct,
+              gastosEstimados
+            );
+            setParam("ahorrosAportados", calc.ahorrosAportados);
+          };
 
-              {activeStep === 3 && (
-                <div className="pt-2 flex justify-between">
-                  <button
-                    onClick={prevStep}
-                    className="px-3 py-1.5 text-slate-500 hover:text-slate-700 font-semibold text-xs rounded-lg cursor-pointer"
-                  >
-                    ← Modificar paso 2
-                  </button>
-                  <button
-                    onClick={nextStep}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
-                  >
-                    Continuar a Ingresos ➔
-                  </button>
+          const opciones = [
+            { pct: 80, titulo: "80%", desc: "Estándar BdE", badge: "Más habitual" },
+            { pct: 90, titulo: "90%", desc: "Jóvenes / Aval ICO", badge: "Aval ICO" },
+            { pct: 95, titulo: "95%", desc: "Financiación Alta", badge: "Convenios" },
+            { pct: 100, titulo: "100%", desc: "Financiación Total", badge: "Solo gastos" },
+          ];
+
+          return (
+            <div className="space-y-3 animate-in fade-in duration-300">
+              <div className="flex items-start gap-2.5 max-w-[92%]">
+                <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] shrink-0 font-bold">
+                  IA
                 </div>
-              )}
+                <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-xs p-3 shadow-xs text-xs text-slate-800">
+                  <p className="font-bold text-slate-900 mb-0.5">¿Cuánto va a financiar el banco?</p>
+                  <p className="text-slate-600">
+                    Puedes elegir una opción rápida de financiación bancaria (80%, 90%, 95% o 100%) o indicar tus ahorros exactos.
+                  </p>
+                </div>
+              </div>
+
+              <div className="ml-8 space-y-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+                {/* Selector de opciones de financiación bancaria */}
+                <div>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                      Opciones de Financiación Bancaria
+                    </span>
+                    <span className="text-xs font-black text-blue-700 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100">
+                      Banco financia: {pctFinanciacionActual}%
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {opciones.map((opc) => {
+                      const isSelected = Math.abs(pctFinanciacionActual - opc.pct) <= 1;
+                      const c = calcularAhorrosParaFinanciacion(
+                        params.precioInmueble,
+                        params.tipoVivienda,
+                        params.comunidadAutonoma,
+                        opc.pct,
+                        gastosEstimados
+                      );
+                      return (
+                        <button
+                          key={opc.pct}
+                          type="button"
+                          onClick={() => aplicarPorcentaje(opc.pct)}
+                          className={`p-2.5 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between ${
+                            isSelected
+                              ? "bg-blue-50 border-blue-600 text-blue-900 ring-2 ring-blue-500/20 shadow-xs"
+                              : "bg-slate-50/70 border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-black text-sm">{opc.titulo}</span>
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
+                              isSelected ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-600"
+                            }`}>
+                              {opc.badge}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-slate-500 mt-1">{opc.desc}</span>
+                          <span className="text-[10px] font-bold text-blue-700 mt-1.5">
+                            Aporte: {c.ahorrosAportados.toLocaleString("es-ES")} €
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Tarjeta de desglose económico */}
+                <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 text-xs space-y-1.5">
+                  <div className="flex justify-between text-slate-600">
+                    <span>🏦 Préstamo solicitado ({pctFinanciacionActual}%):</span>
+                    <span className="font-bold text-slate-900">{prestamoEstimado.toLocaleString("es-ES")} €</span>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>🏠 Entrada requerida ({Math.max(0, 100 - pctFinanciacionActual)}%):</span>
+                    <span className="font-bold text-slate-900">{fondosParaEntrada.toLocaleString("es-ES")} €</span>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>📑 Gastos e impuestos aprox. ({params.comunidadAutonoma}):</span>
+                    <span className="font-bold text-slate-900">{gastosEstimados.toLocaleString("es-ES")} €</span>
+                  </div>
+                  <div className="pt-1.5 border-t border-slate-200 flex justify-between items-center">
+                    <span className="font-black text-slate-800 text-xs">💰 Ahorro total a aportar:</span>
+                    <span className="font-black text-emerald-700 text-sm">
+                      {params.ahorrosAportados.toLocaleString("es-ES")} €
+                    </span>
+                  </div>
+                </div>
+
+                {/* Ajuste fino de ahorro aportado */}
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      Ajustar Ahorro Manualmente
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min={0}
+                        max={params.precioInmueble}
+                        step={1000}
+                        value={params.ahorrosAportados}
+                        onChange={(e) => setParam("ahorrosAportados", Math.max(0, Number(e.target.value)))}
+                        className="w-24 text-right text-xs font-bold px-2 py-1 rounded-lg border border-slate-300 bg-white text-slate-900 outline-none"
+                      />
+                      <span className="text-xs font-bold text-slate-500">€</span>
+                    </div>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={Math.max(params.precioInmueble * 0.6, 150000)}
+                    step={1000}
+                    value={params.ahorrosAportados}
+                    onChange={(e) => setParam("ahorrosAportados", Number(e.target.value))}
+                    className="w-full h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-blue-600"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
+                    <span>0 € (Sin ahorros)</span>
+                    <span>{Math.round(params.precioInmueble * 0.3).toLocaleString("es-ES")} € (~30% habitual)</span>
+                  </div>
+                </div>
+
+                {activeStep === 3 && (
+                  <div className="pt-2 flex justify-between">
+                    <button
+                      onClick={prevStep}
+                      className="px-3 py-1.5 text-slate-500 hover:text-slate-700 font-semibold text-xs rounded-lg cursor-pointer"
+                    >
+                      ← Modificar paso 2
+                    </button>
+                    <button
+                      onClick={nextStep}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                    >
+                      Continuar a Ingresos ➔
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* ================= PASO 4: SITUACIÓN ECONÓMICA ================= */}
         {activeStep >= 4 && (
