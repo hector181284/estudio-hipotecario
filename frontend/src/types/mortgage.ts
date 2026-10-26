@@ -16,12 +16,16 @@ export interface SimularEstudioInputDto {
     contrato: EmploymentType;
     ingresosNetosMensuales: number;
     deudasMensualesVigentes: number;
+    edad?: number;
+    hijosACargo?: number;
   };
   cotitular?: {
     nombre: string;
     contrato: EmploymentType;
     ingresosNetosMensuales: number;
     deudasMensualesVigentes: number;
+    edad?: number;
+    hijosACargo?: number;
   };
   condicion: {
     modalidad: RateType;

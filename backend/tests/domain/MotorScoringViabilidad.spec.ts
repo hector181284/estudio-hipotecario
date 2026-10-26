@@ -104,4 +104,66 @@ describe("Servicio de Dominio: MotorScoringViabilidad", () => {
     expect(dictamen.semaforo).toBe("riesgo_elevado");
     expect(dictamen.ratioDti.isGreaterThan(Percentage.from(40))).toBe(true);
   });
+
+  it("debe alertar y recomendar reducir el plazo si edad + plazo supera 75 años", () => {
+    const inmueble = new Inmueble({
+      precioCompraventa: Money.from(200000),
+      tipo: "segunda_mano",
+      finalidad: "primera_vivienda",
+      comunidadAutonoma: "MD",
+    });
+
+    const participante = Participante.crear({
+      id: "P1",
+      nombre: "Manuel Sánchez",
+      rol: "titular_principal",
+      contrato: "indefinido",
+      ingresosNetosMensuales: Money.from(3500),
+      deudasMensualesVigentes: Money.zero(),
+      edad: 55, // 55 + 25 = 80 > 75
+    });
+
+    const condicion = new CondicionFinanciera({
+      modalidad: "fijo",
+      plazo: PlazoMeses.fromYears(25),
+      tinNominalAnual: Percentage.from(2.85),
+    });
+
+    const ahorros = Money.from(60000);
+    const dictamen = MotorScoringViabilidad.evaluar(inmueble, [participante], condicion, ahorros);
+
+    expect(dictamen.alertas.some((a) => a.includes("75 años"))).toBe(true);
+    expect(dictamen.recomendaciones.some((r) => r.includes("20 años"))).toBe(true); // 75 - 55 = 20
+  });
+
+  it("debe alertar sobre contrato temporal y cambiar semáforo a condicionado", () => {
+    const inmueble = new Inmueble({
+      precioCompraventa: Money.from(180000),
+      tipo: "segunda_mano",
+      finalidad: "primera_vivienda",
+      comunidadAutonoma: "MD",
+    });
+
+    const participante = Participante.crear({
+      id: "P1",
+      nombre: "Sara López",
+      rol: "titular_principal",
+      contrato: "temporal",
+      ingresosNetosMensuales: Money.from(3000),
+      deudasMensualesVigentes: Money.zero(),
+      edad: 30,
+    });
+
+    const condicion = new CondicionFinanciera({
+      modalidad: "fijo",
+      plazo: PlazoMeses.fromYears(25),
+      tinNominalAnual: Percentage.from(2.85),
+    });
+
+    const ahorros = Money.from(55000);
+    const dictamen = MotorScoringViabilidad.evaluar(inmueble, [participante], condicion, ahorros);
+
+    expect(dictamen.semaforo).toBe("condicionado");
+    expect(dictamen.alertas.some((a) => a.includes("temporal"))).toBe(true);
+  });
 });

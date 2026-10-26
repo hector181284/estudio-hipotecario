@@ -6,6 +6,7 @@ import {
   descargarPdfEstudio,
   EstudioResumenDto,
 } from "@/lib/api-client";
+import EstudioDetalleDrawer from "./EstudioDetalleDrawer";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -81,13 +82,22 @@ export default function HistorialView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filtroSemaforo, setFiltroSemaforo] = useState<string>("todos");
+  const [busqueda, setBusqueda] = useState<string>("");
+  const [fechaDesde, setFechaDesde] = useState<string>("");
+  const [fechaHasta, setFechaHasta] = useState<string>("");
   const [descargando, setDescargando] = useState<string | null>(null); // id del estudio
+  const [estudioSeleccionado, setEstudioSeleccionado] = useState<string | null>(null);
 
   const cargarEstudios = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await listarEstudios(PAGE_SIZE, pagina * PAGE_SIZE);
+      const data = await listarEstudios(PAGE_SIZE, pagina * PAGE_SIZE, {
+        search: busqueda.trim() || undefined,
+        semaforo: filtroSemaforo,
+        desde: fechaDesde || undefined,
+        hasta: fechaHasta || undefined,
+      });
       setEstudios(data.estudios);
       setTotal(data.total);
     } catch (err: unknown) {
@@ -95,11 +105,30 @@ export default function HistorialView() {
     } finally {
       setLoading(false);
     }
-  }, [pagina]);
+  }, [pagina, busqueda, filtroSemaforo, fechaDesde, fechaHasta]);
+
+  useEffect(() => {
+    // Si cambia un filtro de búsqueda, volvemos a la primera página
+    setPagina(0);
+  }, [busqueda, filtroSemaforo, fechaDesde, fechaHasta]);
 
   useEffect(() => {
     cargarEstudios();
   }, [cargarEstudios]);
+
+  function limpiarFiltros() {
+    setBusqueda("");
+    setFiltroSemaforo("todos");
+    setFechaDesde("");
+    setFechaHasta("");
+    setPagina(0);
+  }
+
+  const hayFiltrosActivos =
+    busqueda.trim() !== "" ||
+    filtroSemaforo !== "todos" ||
+    fechaDesde !== "" ||
+    fechaHasta !== "";
 
   async function handleDescargarPdf(id: string) {
     setDescargando(id);
@@ -120,30 +149,83 @@ export default function HistorialView() {
     }
   }
 
-  // Filtrado local por semáforo
-  const estudiosVisibles =
-    filtroSemaforo === "todos"
-      ? estudios
-      : estudios.filter((e) => e.semaforo === filtroSemaforo);
-
   const totalPaginas = Math.ceil(total / PAGE_SIZE);
 
   return (
     <div>
+      {/* Drawer de detalle */}
+      <EstudioDetalleDrawer
+        estudioId={estudioSeleccionado}
+        onClose={() => setEstudioSeleccionado(null)}
+      />
+
       {/* ── Cabecera de la sección ── */}
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 className="flex items-center gap-2 text-base font-black text-slate-800">
             <span>📋</span> Historial de Estudios Hipotecarios
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            {total} simulaciones guardadas en PostgreSQL · Ordenadas por fecha (más reciente primero)
+            {total} {total === 1 ? "estudio encontrado" : "estudios encontrados"} en PostgreSQL
           </p>
         </div>
 
-        {/* Filtro por semáforo */}
-        <div className="flex items-center gap-1.5">
-          <span className="text-[11px] text-slate-500 font-medium">Filtrar:</span>
+        <button
+          onClick={cargarEstudios}
+          title="Recargar historial"
+          className="text-slate-600 hover:text-blue-600 text-xs font-bold px-3 py-1.5 rounded-xl hover:bg-white border border-slate-200 transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+        >
+          <span>↻</span> Actualizar lista
+        </button>
+      </div>
+
+      {/* ── Barra de Búsqueda y Filtros Avanzados ── */}
+      <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs mb-5 space-y-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Input de texto para búsqueda */}
+          <div className="flex-1 min-w-[240px] relative">
+            <span className="absolute left-3 top-2.5 text-slate-400 text-xs">🔍</span>
+            <input
+              type="text"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar por solicitante o ID de estudio..."
+              className="w-full text-xs font-semibold pl-8 pr-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:border-blue-500 outline-none transition"
+            />
+          </div>
+
+          {/* Selector de Rango de Fechas */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Desde</span>
+            <input
+              type="date"
+              value={fechaDesde}
+              onChange={(e) => setFechaDesde(e.target.value)}
+              className="text-xs font-semibold border border-slate-200 rounded-xl px-2.5 py-1.5 bg-slate-50 focus:bg-white text-slate-700 outline-none"
+            />
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Hasta</span>
+            <input
+              type="date"
+              value={fechaHasta}
+              onChange={(e) => setFechaHasta(e.target.value)}
+              className="text-xs font-semibold border border-slate-200 rounded-xl px-2.5 py-1.5 bg-slate-50 focus:bg-white text-slate-700 outline-none"
+            />
+          </div>
+
+          {/* Botón limpiar filtros */}
+          {hayFiltrosActivos && (
+            <button
+              onClick={limpiarFiltros}
+              className="text-xs font-bold text-red-600 hover:text-red-700 px-3 py-1.5 rounded-xl hover:bg-red-50 border border-red-200 transition cursor-pointer flex items-center gap-1"
+            >
+              <span>✕</span> Limpiar
+            </button>
+          )}
+        </div>
+
+        {/* Botones de Filtro por Semáforo */}
+        <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-100">
+          <span className="text-[11px] text-slate-500 font-semibold mr-1">Dictamen:</span>
           {["todos", "favorable", "condicionado", "riesgo_elevado"].map((s) => (
             <button
               key={s}
@@ -155,20 +237,10 @@ export default function HistorialView() {
               }`}
             >
               {s === "todos"
-                ? "Todos"
-                : (SEMAFORO_CONFIG[s]?.icon ?? "") +
-                  " " +
-                  (SEMAFORO_CONFIG[s]?.label ?? s)}
+                ? "Todos los dictámenes"
+                : (SEMAFORO_CONFIG[s]?.icon ?? "") + " " + (SEMAFORO_CONFIG[s]?.label ?? s)}
             </button>
           ))}
-
-          <button
-            onClick={cargarEstudios}
-            title="Recargar historial"
-            className="ml-1 text-slate-500 hover:text-blue-600 text-sm font-bold px-2 py-1 rounded-lg hover:bg-blue-50 border border-slate-200 transition cursor-pointer"
-          >
-            ↻
-          </button>
         </div>
       </div>
 
@@ -185,13 +257,27 @@ export default function HistorialView() {
           <div className="w-8 h-8 border-2 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
           Cargando estudios desde PostgreSQL...
         </div>
-      ) : estudiosVisibles.length === 0 ? (
-        <div className="py-16 text-center text-slate-400">
-          <span className="text-4xl block mb-2">📭</span>
-          <p className="text-sm font-medium">No hay estudios guardados todavía</p>
-          <p className="text-xs mt-1">
-            Las simulaciones realizadas en el Asistente Conversacional aparecerán aquí.
+      ) : estudios.length === 0 ? (
+        <div className="py-16 text-center text-slate-400 bg-white rounded-2xl border border-slate-200">
+          <span className="text-4xl block mb-2">{hayFiltrosActivos ? "🔎" : "📭"}</span>
+          <p className="text-sm font-bold text-slate-700">
+            {hayFiltrosActivos
+              ? "No se encontraron estudios que coincidan con la búsqueda"
+              : "No hay estudios guardados todavía"}
           </p>
+          <p className="text-xs mt-1 text-slate-500">
+            {hayFiltrosActivos
+              ? "Prueba a modificar los términos de búsqueda o el rango de fechas."
+              : "Las simulaciones realizadas en el Asistente Conversacional aparecerán aquí."}
+          </p>
+          {hayFiltrosActivos && (
+            <button
+              onClick={limpiarFiltros}
+              className="mt-3 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200 transition cursor-pointer"
+            >
+              Restablecer todos los filtros
+            </button>
+          )}
         </div>
       ) : (
         <>
@@ -201,18 +287,20 @@ export default function HistorialView() {
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 uppercase tracking-wide">
                   <tr>
-                    <th className="px-4 py-3 text-left font-bold">Fecha</th>
-                    <th className="px-4 py-3 text-left font-bold">Dictamen</th>
-                    <th className="px-4 py-3 text-left font-bold">Comunidad</th>
-                    <th className="px-4 py-3 text-left font-bold">Tipo</th>
-                    <th className="px-4 py-3 text-right font-bold">Capital</th>
-                    <th className="px-4 py-3 text-right font-bold">Cuota/mes</th>
-                    <th className="px-4 py-3 text-center font-bold">Plazo</th>
-                    <th className="px-4 py-3 text-center font-bold">PDF</th>
+                    <th className="px-4 py-3 text-left font-bold whitespace-nowrap">Fecha / ID</th>
+                    <th className="px-4 py-3 text-left font-bold whitespace-nowrap">Solicitante</th>
+                    <th className="px-4 py-3 text-left font-bold whitespace-nowrap">Dictamen</th>
+                    <th className="px-4 py-3 text-left font-bold whitespace-nowrap">Comunidad</th>
+                    <th className="px-4 py-3 text-left font-bold whitespace-nowrap">Tipo</th>
+                    <th className="px-4 py-3 text-right font-bold whitespace-nowrap">Capital</th>
+                    <th className="px-4 py-3 text-right font-bold whitespace-nowrap">Cuota/mes</th>
+                    <th className="px-4 py-3 text-center font-bold whitespace-nowrap">Plazo</th>
+                    <th className="px-4 py-3 text-center font-bold whitespace-nowrap">Ver</th>
+                    <th className="px-4 py-3 text-center font-bold whitespace-nowrap">PDF</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {estudiosVisibles.map((e) => {
+                  {estudios.map((e) => {
                     const sem = SEMAFORO_CONFIG[e.semaforo ?? ""] ?? {
                       bg: "bg-slate-50 border-slate-200",
                       text: "text-slate-600",
@@ -224,11 +312,12 @@ export default function HistorialView() {
                     return (
                       <tr
                         key={e.id}
-                        className="hover:bg-slate-50/60 transition group"
+                        className="hover:bg-blue-50/40 transition group cursor-pointer"
+                        onClick={() => setEstudioSeleccionado(e.id)}
                       >
                         {/* Fecha */}
-                        <td className="px-4 py-3">
-                          <div className="font-mono text-[11px] text-slate-500">
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="font-mono text-[11px] text-slate-600 font-semibold">
                             {formatFecha(e.creadoEn)}
                           </div>
                           <div className="text-[10px] text-slate-400 font-mono truncate max-w-[120px]" title={e.id}>
@@ -236,18 +325,33 @@ export default function HistorialView() {
                           </div>
                         </td>
 
+                        {/* Solicitante */}
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                            <span className="text-slate-400">👤</span>
+                            <span>{e.titularNombre || "Titular"}</span>
+                          </div>
+                          {e.cotitularNombre && (
+                            <div className="text-[10px] text-blue-600 font-semibold flex items-center gap-0.5 mt-0.5">
+                              <span>+</span>
+                              <span>{e.cotitularNombre}</span>
+                            </div>
+                          )}
+                        </td>
+
                         {/* Dictamen / Semáforo */}
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <span
-                            className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full border ${sem.bg} ${sem.text}`}
+                            className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg border whitespace-nowrap ${sem.bg} ${sem.text}`}
                           >
-                            {sem.icon} {sem.label}
+                            <span className="text-xs leading-none">{sem.icon}</span>
+                            <span>{sem.label}</span>
                           </span>
                         </td>
 
                         {/* Comunidad */}
-                        <td className="px-4 py-3">
-                          <span className="font-mono text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded mr-1">
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="font-mono text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded mr-1.5 font-bold">
                             {e.comunidadAutonoma}
                           </span>
                           <span className="text-xs text-slate-700">
@@ -256,31 +360,48 @@ export default function HistorialView() {
                         </td>
 
                         {/* Tipo vivienda */}
-                        <td className="px-4 py-3 text-xs text-slate-600">
+                        <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">
                           {TIPO_LABEL[e.tipoVivienda] ?? e.tipoVivienda}
                         </td>
 
                         {/* Capital */}
-                        <td className="px-4 py-3 text-right font-bold text-slate-800 tabular-nums">
+                        <td className="px-4 py-3 text-right font-bold text-slate-800 tabular-nums whitespace-nowrap">
                           {formatEuro(e.capitalPrestado)}
                         </td>
 
                         {/* Cuota */}
-                        <td className="px-4 py-3 text-right tabular-nums">
+                        <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap">
                           <span className="font-black text-slate-900">
                             {formatEuro(e.cuotaMensual)}
                           </span>
                         </td>
 
                         {/* Plazo */}
-                        <td className="px-4 py-3 text-center text-xs text-slate-600">
+                        <td className="px-4 py-3 text-center text-xs text-slate-600 whitespace-nowrap">
                           {e.plazoAnios} años
+                        </td>
+
+                        {/* Ver Detalle */}
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              setEstudioSeleccionado(e.id);
+                            }}
+                            title={`Ver detalle completo del estudio ${e.id}`}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg transition cursor-pointer"
+                          >
+                            <span>👁️</span> Ver
+                          </button>
                         </td>
 
                         {/* PDF Download */}
                         <td className="px-4 py-3 text-center">
                           <button
-                            onClick={() => handleDescargarPdf(e.id)}
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              handleDescargarPdf(e.id);
+                            }}
                             disabled={isDescargando}
                             title={`Descargar informe PDF del estudio ${e.id}`}
                             className="inline-flex items-center gap-1 px-3 py-1.5 text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed group-hover:shadow-xs"

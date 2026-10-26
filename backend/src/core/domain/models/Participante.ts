@@ -10,6 +10,8 @@ export interface ParticipanteProps {
   contrato: TipoContratoLaboral;
   ingresosNetosMensuales: Money;
   deudasMensualesVigentes: Money;
+  edad?: number;
+  hijosACargo?: number;
 }
 
 export class Participante {
@@ -19,6 +21,8 @@ export class Participante {
   public readonly contrato: TipoContratoLaboral;
   public readonly ingresosNetosMensuales: Money;
   public readonly deudasMensualesVigentes: Money;
+  public readonly edad?: number;
+  public readonly hijosACargo?: number;
 
   constructor(props: ParticipanteProps) {
     this.id = props.id;
@@ -27,6 +31,8 @@ export class Participante {
     this.contrato = props.contrato;
     this.ingresosNetosMensuales = props.ingresosNetosMensuales;
     this.deudasMensualesVigentes = props.deudasMensualesVigentes;
+    this.edad = props.edad;
+    this.hijosACargo = props.hijosACargo ?? 0;
   }
 
   public static crear(props: ParticipanteProps): Participante {

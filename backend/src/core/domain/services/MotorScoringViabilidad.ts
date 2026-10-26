@@ -151,12 +151,74 @@ export class MotorScoringViabilidad {
       );
     }
 
-    // 4. Umbral de subsistencia
-    const subsistenciaMinima = politica.minIngresoSubsistenciaPorAdulto.multiply(participantes.length);
+    // 4. Umbral de subsistencia y cargas familiares
+    let totalHijos = 0;
+    for (const p of participantes) {
+      totalHijos += p.hijosACargo ?? 0;
+    }
+    const gastoHijosEstimado = Money.from(200.0).multiply(totalHijos);
+    const subsistenciaAdultos = politica.minIngresoSubsistenciaPorAdulto.multiply(participantes.length);
+    const subsistenciaMinima = subsistenciaAdultos.add(gastoHijosEstimado);
+
     if (rentaDisponibleTrasCuota.isLessThan(subsistenciaMinima)) {
       if (semaforo !== "riesgo_elevado") semaforo = "condicionado";
+      if (totalHijos > 0) {
+        alertas.push(
+          `La renta disponible (${rentaDisponibleTrasCuota.formatEuro()}) es ajustada para cubrir el umbral mínimo de subsistencia con ${totalHijos} hijo(s) a cargo (${subsistenciaMinima.formatEuro()} estimados).`
+        );
+      } else {
+        alertas.push(
+          `La renta remanente tras cuota (${rentaDisponibleTrasCuota.formatEuro()}) roza el umbral de subsistencia mínima de la unidad familiar.`
+        );
+      }
+    }
+
+    // 5. Evaluación de Edad al Vencimiento (Límite estándar bancario: 75 años)
+    const plazoAnios = condicion.plazo.getYears();
+    for (const p of participantes) {
+      if (p.edad && p.edad > 0) {
+        const edadVencimiento = p.edad + plazoAnios;
+        if (edadVencimiento > 75) {
+          const maxPlazoViable = Math.max(5, 75 - p.edad);
+          if (edadVencimiento > 78) {
+            semaforo = "riesgo_elevado";
+          } else if (semaforo !== "riesgo_elevado") {
+            semaforo = "condicionado";
+          }
+          alertas.push(
+            `Edad de ${p.nombre} (${p.edad} años) al vencimiento (${edadVencimiento} años) supera el límite prudencial bancario de 75 años.`
+          );
+          recomendaciones.push(
+            `Ajustar el plazo de amortización a un máximo de ${maxPlazoViable} años para no exceder los 75 años al finalizar la hipoteca.`
+          );
+        }
+      }
+    }
+
+    // 6. Evaluación de Estabilidad Laboral
+    const tieneTemporal = participantes.some((p) => p.contrato === "temporal");
+    const tieneAutonomo = participantes.some((p) => p.contrato === "autonomo");
+    const todosFuncionarios = participantes.length > 0 && participantes.every((p) => p.contrato === "funcionario");
+
+    if (tieneTemporal) {
+      if (semaforo === "favorable") semaforo = "condicionado";
       alertas.push(
-        `La renta remanente tras cuota (${rentaDisponibleTrasCuota.formatEuro()}) roza el umbral de subsistencia mínima de la unidad familiar.`
+        `Contrato temporal detectado: las entidades bancarias suelen exigir un avalista con contrato indefinido o no ponderar el 100% de estos ingresos.`
+      );
+      recomendaciones.push(
+        `Aportar cotitular con contrato indefinido o aval solidario para mitigar el riesgo laboral.`
+      );
+    }
+
+    if (tieneAutonomo) {
+      recomendaciones.push(
+        `Perfil de trabajador autónomo: preparar los 2 últimos ejercicios de IRPF (modelos 100) y declaraciones trimestrales de IVA/IRPF (modelos 130/303) para justificar solvencia continuada.`
+      );
+    }
+
+    if (todosFuncionarios) {
+      recomendaciones.push(
+        `Perfil de empleado público / funcionario: excelente scoring de estabilidad laboral, lo que favorece tipos de interés competitivos y mayor flexibilidad en concesión.`
       );
     }
 

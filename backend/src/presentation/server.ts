@@ -377,9 +377,15 @@ const server = http.createServer((req, res) => {
         const params = parseQueryParams(req.url ?? "");
         const limite = parseInt(params["limit"] ?? "20", 10);
         const offset = parseInt(params["offset"] ?? "0", 10);
+        const filtros = {
+          search: params["search"] || undefined,
+          semaforo: params["semaforo"] || undefined,
+          desde: params["desde"] ? new Date(params["desde"]) : undefined,
+          hasta: params["hasta"] ? new Date(params["hasta"]) : undefined,
+        };
         const [estudios, total] = await Promise.all([
-          estudioRepository.listar(limite, offset),
-          estudioRepository.contar(),
+          estudioRepository.listar(limite, offset, filtros),
+          estudioRepository.contar(filtros),
         ]);
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ total, limite, offset, estudios }, null, 2));

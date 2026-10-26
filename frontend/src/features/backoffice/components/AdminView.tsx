@@ -517,8 +517,21 @@ const TABS: { id: AdminTab; label: string; icon: string }[] = [
   { id: "fiscalidad", label: "Tablas fiscales", icon: "🗺️" },
 ];
 
-export default function AdminView() {
+interface AdminViewProps {
+  onLogout?: () => void;
+}
+
+export default function AdminView({ onLogout }: AdminViewProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>("historial");
+
+  function handleLogout() {
+    if (onLogout) {
+      onLogout();
+    } else {
+      sessionStorage.removeItem("eh_admin_authenticated");
+      window.location.reload();
+    }
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -549,6 +562,13 @@ export default function AdminView() {
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             PostgreSQL Conectado
           </span>
+          <button
+            onClick={handleLogout}
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-slate-100 hover:bg-red-50 text-slate-700 hover:text-red-700 border border-slate-200 hover:border-red-200 transition cursor-pointer"
+            title="Cerrar sesión de administrador"
+          >
+            <span>🚪</span> Cerrar sesión
+          </button>
         </div>
       </div>
 

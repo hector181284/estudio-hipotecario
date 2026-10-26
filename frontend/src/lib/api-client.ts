@@ -120,6 +120,15 @@ export interface EstudioResumenDto {
   comunidadAutonoma: string;
   plazoAnios: number;
   tipoVivienda: string;
+  titularNombre?: string;
+  cotitularNombre?: string;
+}
+
+export interface HistorialFiltros {
+  search?: string;
+  semaforo?: string;
+  desde?: string;
+  hasta?: string;
 }
 
 export interface HistorialEstudiosResponse {
@@ -131,13 +140,31 @@ export interface HistorialEstudiosResponse {
 
 export async function listarEstudios(
   limite = 20,
-  offset = 0
+  offset = 0,
+  filtros?: HistorialFiltros
 ): Promise<HistorialEstudiosResponse> {
-  const res = await fetch(
-    `${API_URL}/api/v1/estudios?limit=${limite}&offset=${offset}`
-  );
+  const query = new URLSearchParams({
+    limit: String(limite),
+    offset: String(offset),
+  });
+
+  if (filtros?.search?.trim()) query.set("search", filtros.search.trim());
+  if (filtros?.semaforo && filtros.semaforo !== "todos") query.set("semaforo", filtros.semaforo);
+  if (filtros?.desde) query.set("desde", filtros.desde);
+  if (filtros?.hasta) query.set("hasta", filtros.hasta);
+
+  const res = await fetch(`${API_URL}/api/v1/estudios?${query.toString()}`);
   if (!res.ok) throw new Error("Error al listar estudios");
   return res.json();
+}
+
+export async function obtenerEstudio(id: string): Promise<SimularEstudioOutputDto> {
+  const res = await fetch(`${API_URL}/api/v1/estudios/${id}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Error al obtener el estudio" }));
+    throw new Error(err.error ?? "Error al obtener el estudio");
+  }
+  return res.json() as Promise<SimularEstudioOutputDto>;
 }
 
 export async function descargarPdfEstudio(id: string): Promise<Blob> {

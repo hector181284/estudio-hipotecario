@@ -22,12 +22,16 @@ export interface SimularEstudioInputDto {
     contrato: TipoContratoLaboral;
     ingresosNetosMensuales: number;
     deudasMensualesVigentes: number;
+    edad?: number;
+    hijosACargo?: number;
   };
   cotitular?: {
     nombre: string;
     contrato: TipoContratoLaboral;
     ingresosNetosMensuales: number;
     deudasMensualesVigentes: number;
+    edad?: number;
+    hijosACargo?: number;
   };
   condicion: {
     modalidad: ModalidadTipo;
@@ -90,6 +94,8 @@ export class SimularEstudioHipotecarioUseCase {
         contrato: dto.titularPrincipal.contrato,
         ingresosNetosMensuales: Money.from(dto.titularPrincipal.ingresosNetosMensuales),
         deudasMensualesVigentes: Money.from(dto.titularPrincipal.deudasMensualesVigentes),
+        edad: dto.titularPrincipal.edad,
+        hijosACargo: dto.titularPrincipal.hijosACargo,
       }),
     ];
 
@@ -102,6 +108,8 @@ export class SimularEstudioHipotecarioUseCase {
           contrato: dto.cotitular.contrato,
           ingresosNetosMensuales: Money.from(dto.cotitular.ingresosNetosMensuales),
           deudasMensualesVigentes: Money.from(dto.cotitular.deudasMensualesVigentes),
+          edad: dto.cotitular.edad,
+          hijosACargo: dto.cotitular.hijosACargo,
         })
       );
     }

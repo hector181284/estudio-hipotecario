@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import AdminView from "@/features/backoffice/components/AdminView";
+import AdminLoginGate from "@/features/backoffice/components/AdminLoginGate";
 
 export const metadata: Metadata = {
   title: "Portal de Maestros | Estudio Hipotecario",
@@ -7,5 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default function AdminPage() {
-  return <AdminView />;
+  return (
+    <AdminLoginGate>
+      <AdminView />
+    </AdminLoginGate>
+  );
 }

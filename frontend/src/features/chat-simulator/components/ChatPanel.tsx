@@ -327,6 +327,23 @@ export default function ChatPanel() {
             </div>
 
             <div className="ml-8 space-y-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
+              {/* Nombre y Apellidos del Titular */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                  Nombre y Apellidos del Solicitante
+                </label>
+                <div className="flex items-center border border-slate-300 rounded-xl px-2.5 py-1.5 bg-white focus-within:border-blue-500 transition">
+                  <span className="text-slate-400 text-xs mr-2">👤</span>
+                  <input
+                    type="text"
+                    placeholder="ej. Carlos Gómez Pérez"
+                    value={params.titularPrincipal.nombre === "Titular" ? "" : params.titularPrincipal.nombre}
+                    onChange={(e) => setTitular("nombre", e.target.value)}
+                    className="w-full text-xs font-bold text-slate-800 outline-none placeholder:font-normal placeholder:text-slate-400"
+                  />
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
@@ -337,14 +354,33 @@ export default function ChatPanel() {
                     onChange={(e) => setTitular("contrato", e.target.value as EmploymentType)}
                     className="w-full text-xs font-semibold border border-slate-300 rounded-xl px-2.5 py-2 bg-white text-slate-800 outline-none"
                   >
-                    <option value="indefinido">Indefinido</option>
-                    <option value="funcionario">Funcionario</option>
-                    <option value="autonomo">Autónomo</option>
-                    <option value="temporal">Temporal</option>
-                    <option value="pensionista">Pensionista</option>
+                    <option value="indefinido">👔 Indefinido (Cuenta ajena)</option>
+                    <option value="funcionario">🏛️ Funcionario público</option>
+                    <option value="autonomo">💼 Autónomo / Freelance</option>
+                    <option value="temporal">⏳ Temporal (Cuenta ajena)</option>
+                    <option value="pensionista">🧓 Pensionista</option>
                   </select>
                 </div>
 
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    Edad del titular
+                  </label>
+                  <div className="flex items-center border border-slate-300 rounded-xl px-2.5 py-1.5 bg-white">
+                    <input
+                      type="number"
+                      min={18}
+                      max={75}
+                      value={params.titularPrincipal.edad ?? 34}
+                      onChange={(e) => setTitular("edad", Number(e.target.value))}
+                      className="w-full text-xs font-bold text-slate-800 outline-none"
+                    />
+                    <span className="text-[10px] text-slate-400 ml-1">años</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
                     Ingresos netos
@@ -360,21 +396,44 @@ export default function ChatPanel() {
                     <span className="text-[10px] text-slate-400 ml-1">€/mes</span>
                   </div>
                 </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    Deudas o cuotas mensuales
+                  </label>
+                  <div className="flex items-center border border-slate-300 rounded-xl px-2.5 py-1.5 bg-white">
+                    <input
+                      type="number"
+                      step={25}
+                      value={params.titularPrincipal.deudasMensualesVigentes}
+                      onChange={(e) => setTitular("deudasMensualesVigentes", Number(e.target.value))}
+                      className="w-full text-xs font-bold text-slate-800 outline-none"
+                    />
+                    <span className="text-[10px] text-slate-400 ml-1">€/mes</span>
+                  </div>
+                </div>
               </div>
 
               <div>
                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                  Otros préstamos o deudas vigentes
+                  Hijos o cargas familiares
                 </label>
-                <div className="flex items-center border border-slate-300 rounded-xl px-2.5 py-1.5 bg-white">
-                  <input
-                    type="number"
-                    step={25}
-                    value={params.titularPrincipal.deudasMensualesVigentes}
-                    onChange={(e) => setTitular("deudasMensualesVigentes", Number(e.target.value))}
-                    className="w-full text-xs font-bold text-slate-800 outline-none"
-                  />
-                  <span className="text-[10px] text-slate-400 ml-1">€/mes</span>
+                <div className="flex items-center gap-1.5">
+                  {[0, 1, 2, 3, 4].map((num) => (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => setTitular("hijosACargo", num)}
+                      className={cn(
+                        "flex-1 py-1 rounded-lg border text-[11px] font-bold transition cursor-pointer text-center",
+                        (params.titularPrincipal.hijosACargo ?? 0) === num
+                          ? "bg-blue-50 border-blue-600 text-blue-700 shadow-2xs"
+                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                      )}
+                    >
+                      {num === 0 ? "0" : num === 4 ? "4+" : num}
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -420,6 +479,23 @@ export default function ChatPanel() {
                       </span>
                     </div>
 
+                    {/* Nombre y Apellidos del Cotitular */}
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                        Nombre y Apellidos del Cotitular
+                      </label>
+                      <div className="flex items-center border border-slate-300 rounded-xl px-2.5 py-1.5 bg-white focus-within:border-blue-500 transition">
+                        <span className="text-slate-400 text-xs mr-2">👤</span>
+                        <input
+                          type="text"
+                          placeholder="ej. Sara López Ruiz"
+                          value={params.cotitular.nombre === "Cotitular" ? "" : params.cotitular.nombre}
+                          onChange={(e) => setCotitular("nombre", e.target.value)}
+                          className="w-full text-xs font-bold text-slate-800 outline-none placeholder:font-normal placeholder:text-slate-400"
+                        />
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
@@ -430,17 +506,36 @@ export default function ChatPanel() {
                           onChange={(e) => setCotitular("contrato", e.target.value as EmploymentType)}
                           className="w-full text-xs font-semibold border border-slate-300 rounded-xl px-2.5 py-2 bg-white text-slate-800 outline-none"
                         >
-                          <option value="indefinido">Indefinido</option>
-                          <option value="funcionario">Funcionario</option>
-                          <option value="autonomo">Autónomo</option>
-                          <option value="temporal">Temporal</option>
-                          <option value="pensionista">Pensionista</option>
+                          <option value="indefinido">👔 Indefinido</option>
+                          <option value="funcionario">🏛️ Funcionario</option>
+                          <option value="autonomo">💼 Autónomo</option>
+                          <option value="temporal">⏳ Temporal</option>
+                          <option value="pensionista">🧓 Pensionista</option>
                         </select>
                       </div>
 
                       <div>
                         <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                          Ingresos netos
+                          Edad cotitular
+                        </label>
+                        <div className="flex items-center border border-slate-300 rounded-xl px-2.5 py-1.5 bg-white">
+                          <input
+                            type="number"
+                            min={18}
+                            max={75}
+                            value={params.cotitular.edad ?? 32}
+                            onChange={(e) => setCotitular("edad", Number(e.target.value))}
+                            className="w-full text-xs font-bold text-slate-800 outline-none"
+                          />
+                          <span className="text-[10px] text-slate-400 ml-1">años</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                          Ingresos netos cotitular
                         </label>
                         <div className="flex items-center border border-slate-300 rounded-xl px-2.5 py-1.5 bg-white">
                           <input
@@ -453,21 +548,21 @@ export default function ChatPanel() {
                           <span className="text-[10px] text-slate-400 ml-1">€/mes</span>
                         </div>
                       </div>
-                    </div>
 
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                        Otras deudas o préstamos del cotitular
-                      </label>
-                      <div className="flex items-center border border-slate-300 rounded-xl px-2.5 py-1.5 bg-white">
-                        <input
-                          type="number"
-                          step={25}
-                          value={params.cotitular.deudasMensualesVigentes}
-                          onChange={(e) => setCotitular("deudasMensualesVigentes", Number(e.target.value))}
-                          className="w-full text-xs font-bold text-slate-800 outline-none"
-                        />
-                        <span className="text-[10px] text-slate-400 ml-1">€/mes</span>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                          Deudas del cotitular
+                        </label>
+                        <div className="flex items-center border border-slate-300 rounded-xl px-2.5 py-1.5 bg-white">
+                          <input
+                            type="number"
+                            step={25}
+                            value={params.cotitular.deudasMensualesVigentes}
+                            onChange={(e) => setCotitular("deudasMensualesVigentes", Number(e.target.value))}
+                            className="w-full text-xs font-bold text-slate-800 outline-none"
+                          />
+                          <span className="text-[10px] text-slate-400 ml-1">€/mes</span>
+                        </div>
                       </div>
                     </div>
 

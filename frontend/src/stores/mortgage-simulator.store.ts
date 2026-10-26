@@ -32,6 +32,8 @@ const DEFAULT_COTITULAR = {
   contrato: "indefinido" as const,
   ingresosNetosMensuales: 1800,
   deudasMensualesVigentes: 0,
+  edad: 32,
+  hijosACargo: 0,
 };
 
 const DEFAULT_PARAMS: SimularEstudioInputDto = {
@@ -45,6 +47,8 @@ const DEFAULT_PARAMS: SimularEstudioInputDto = {
     contrato: "indefinido",
     ingresosNetosMensuales: 3200,
     deudasMensualesVigentes: 0,
+    edad: 34,
+    hijosACargo: 0,
   },
   condicion: {
     modalidad: "fijo",

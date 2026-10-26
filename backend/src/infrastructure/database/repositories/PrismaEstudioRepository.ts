@@ -1,5 +1,5 @@
 import { prisma } from "../prisma-client.js";
-import type { IEstudioRepository, EstudioResumen, EstudioCompletoPersistido } from "../../../core/domain/ports/IEstudioRepository.js";
+import type { IEstudioRepository, EstudioResumen, EstudioCompletoPersistido, FiltrosEstudio } from "../../../core/domain/ports/IEstudioRepository.js";
 import type { SimularEstudioInputDto, SimularEstudioOutputDto } from "../../../core/application/use-cases/SimularEstudioHipotecarioUseCase.js";
 import { CalculadoraAmortizacionFrancesa } from "../../../core/domain/services/CalculadoraAmortizacionFrancesa.js";
 import { Money } from "../../../core/domain/value-objects/Money.js";
@@ -20,6 +20,8 @@ export class PrismaEstudioRepository implements IEstudioRepository {
         contrato: input.titularPrincipal.contrato,
         ingresosNetosMensuales: input.titularPrincipal.ingresosNetosMensuales,
         deudasMensualesVigentes: input.titularPrincipal.deudasMensualesVigentes,
+        edad: input.titularPrincipal.edad ?? null,
+        hijosACargo: input.titularPrincipal.hijosACargo ?? 0,
       },
       ...(input.cotitular
         ? [
@@ -29,6 +31,8 @@ export class PrismaEstudioRepository implements IEstudioRepository {
               contrato: input.cotitular.contrato,
               ingresosNetosMensuales: input.cotitular.ingresosNetosMensuales,
               deudasMensualesVigentes: input.cotitular.deudasMensualesVigentes,
+              edad: input.cotitular.edad ?? null,
+              hijosACargo: input.cotitular.hijosACargo ?? 0,
             },
           ]
         : []),
@@ -99,6 +103,8 @@ export class PrismaEstudioRepository implements IEstudioRepository {
         contrato: (titular?.contrato ?? "indefinido") as TipoContratoLaboral,
         ingresosNetosMensuales: titular?.ingresosNetosMensuales.toNumber() ?? 0,
         deudasMensualesVigentes: titular?.deudasMensualesVigentes.toNumber() ?? 0,
+        edad: titular?.edad ?? undefined,
+        hijosACargo: titular?.hijosACargo ?? 0,
       },
       cotitular: cotitular
         ? {
@@ -106,6 +112,8 @@ export class PrismaEstudioRepository implements IEstudioRepository {
             contrato: cotitular.contrato as TipoContratoLaboral,
             ingresosNetosMensuales: cotitular.ingresosNetosMensuales.toNumber(),
             deudasMensualesVigentes: cotitular.deudasMensualesVigentes.toNumber(),
+            edad: cotitular.edad ?? undefined,
+            hijosACargo: cotitular.hijosACargo ?? 0,
           }
         : undefined,
       condicion: {
@@ -156,8 +164,40 @@ export class PrismaEstudioRepository implements IEstudioRepository {
     return { input, output };
   }
 
-  async listar(limite = 20, offset = 0): Promise<EstudioResumen[]> {
+  private construirWhere(filtros?: FiltrosEstudio) {
+    if (!filtros) return {};
+
+    const where: any = {};
+
+    if (filtros.semaforo && filtros.semaforo !== "todos") {
+      where.semaforo = filtros.semaforo;
+    }
+
+    if (filtros.desde || filtros.hasta) {
+      where.creadoEn = {};
+      if (filtros.desde) where.creadoEn.gte = filtros.desde;
+      if (filtros.hasta) {
+        const finDelDia = new Date(filtros.hasta);
+        finDelDia.setHours(23, 59, 59, 999);
+        where.creadoEn.lte = finDelDia;
+      }
+    }
+
+    if (filtros.search && filtros.search.trim()) {
+      const q = filtros.search.trim();
+      where.OR = [
+        { id: { contains: q, mode: "insensitive" } },
+        { participantes: { some: { nombre: { contains: q, mode: "insensitive" } } } },
+      ];
+    }
+
+    return where;
+  }
+
+  async listar(limite = 20, offset = 0, filtros?: FiltrosEstudio): Promise<EstudioResumen[]> {
+    const where = this.construirWhere(filtros);
     const estudios = await prisma.estudioHipotecario.findMany({
+      where,
       take: limite,
       skip: offset,
       orderBy: { creadoEn: "desc" },
@@ -170,22 +210,35 @@ export class PrismaEstudioRepository implements IEstudioRepository {
         comunidadAutonoma: true,
         plazoAnios: true,
         tipoVivienda: true,
+        participantes: {
+          select: {
+            nombre: true,
+            rol: true,
+          },
+        },
       },
     });
 
-    return estudios.map((e) => ({
-      id: e.id,
-      creadoEn: e.creadoEn,
-      semaforo: e.semaforo,
-      cuotaMensual: e.cuotaMensual?.toNumber() ?? null,
-      capitalPrestado: e.capitalPrestado?.toNumber() ?? null,
-      comunidadAutonoma: e.comunidadAutonoma,
-      plazoAnios: e.plazoAnios,
-      tipoVivienda: e.tipoVivienda,
-    }));
+    return estudios.map((e) => {
+      const titular = e.participantes.find((p) => p.rol === "titular_principal");
+      const cotitular = e.participantes.find((p) => p.rol === "cotitular");
+      return {
+        id: e.id,
+        creadoEn: e.creadoEn,
+        semaforo: e.semaforo,
+        cuotaMensual: e.cuotaMensual?.toNumber() ?? null,
+        capitalPrestado: e.capitalPrestado?.toNumber() ?? null,
+        comunidadAutonoma: e.comunidadAutonoma,
+        plazoAnios: e.plazoAnios,
+        tipoVivienda: e.tipoVivienda,
+        titularNombre: titular?.nombre,
+        cotitularNombre: cotitular?.nombre,
+      };
+    });
   }
 
-  async contar(): Promise<number> {
-    return prisma.estudioHipotecario.count();
+  async contar(filtros?: FiltrosEstudio): Promise<number> {
+    const where = this.construirWhere(filtros);
+    return prisma.estudioHipotecario.count({ where });
   }
 }

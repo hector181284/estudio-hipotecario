@@ -39,6 +39,18 @@ model EstudioHipotecario {
   alertas             String[]
   recomendaciones     String[]
 
+  // Ciclo de Vida y Seguimiento Hipotecario
+  estadoOperacion     String?   @default("estudio_inicial")
+  bancoSeleccionado   String?
+  gestorAsignado      String?
+  fechaLimiteArras    DateTime?
+  importeArras        Decimal?  @db.Decimal(18, 2)
+  tasadora            String?
+  valorTasacionReal   Decimal?  @db.Decimal(18, 2)
+  notaria             String?
+  fechaFirmaNotaria   DateTime?
+  notasSeguimiento    String[]  @default([])
+
   participantes       Participante[]
 }
 
@@ -51,6 +63,8 @@ model Participante {
   contrato                String
   ingresosNetosMensuales  Decimal            @db.Decimal(18, 2)
   deudasMensualesVigentes Decimal            @db.Decimal(18, 2)
+  edad                    Int?
+  hijosACargo             Int?               @default(0)
 
   @@index([estudioId])
 }

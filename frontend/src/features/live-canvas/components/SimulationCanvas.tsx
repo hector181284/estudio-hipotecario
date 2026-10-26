@@ -189,8 +189,9 @@ export default function SimulationCanvas() {
     <div className="relative h-full overflow-y-auto bg-slate-50/50">
       
       {/* ── Banner Superior Semáforo Reactivo ── */}
-      <div className={`p-6 border-b transition-colors duration-300 ${sem.bg} ${sem.border}`}>
-        <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className={`transition-colors duration-300 ${sem.bg} ${sem.border} border-b`}>
+        {/* Fila principal: icono + dictamen + cuota */}
+        <div className="px-6 pt-5 pb-4 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-start gap-3.5">
             <span className="text-3xl shrink-0 p-1 bg-white rounded-xl shadow-xs">{sem.icon}</span>
             <div>
@@ -204,40 +205,24 @@ export default function SimulationCanvas() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 ml-auto">
-            <button
-              onClick={reset}
-              title="Borrar datos y reiniciar estudio"
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-white/90 hover:bg-white text-slate-700 hover:text-blue-700 text-xs font-bold rounded-xl border border-slate-200/80 shadow-xs transition cursor-pointer active:scale-95"
-            >
-              <span>✨</span> Nuevo Cálculo
-            </button>
-            <div className="bg-white/95 px-5 py-3 rounded-2xl border border-slate-200/80 shadow-xs text-right">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                Cuota Estimada
-              </span>
-              <span className="text-2xl font-black text-slate-900 tracking-tight transition-all duration-300">
-                {dictamen.cuotaMensualFormateada}
-              </span>
-              <span className="text-[10px] text-slate-500 block">
-                al mes ({params.condicion.plazoAnios} años al {params.condicion.tinAnual.toFixed(2)}%)
-              </span>
-            </div>
+          <div className="bg-white/95 px-5 py-3 rounded-2xl border border-slate-200/80 shadow-xs text-right ml-auto">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+              Cuota Estimada
+            </span>
+            <span className="text-2xl font-black text-slate-900 tracking-tight transition-all duration-300">
+              {dictamen.cuotaMensualFormateada}
+            </span>
+            <span className="text-[10px] text-slate-500 block">
+              al mes ({params.condicion.plazoAnios} años · {params.condicion.tinAnual.toFixed(2)}% TIN)
+            </span>
           </div>
         </div>
-      </div>
 
-      {/* ── Panel de Ajuste Rápido ── */}
-      <div className="mx-6 mt-4 mb-0 bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-        <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
-          <span className="text-sm">🎛️</span>
-          <span className="text-[11px] font-black text-slate-600 uppercase tracking-wider">Ajuste Rápido de Parámetros</span>
-          <span className="ml-auto text-[10px] text-slate-400 italic">Los cambios recalculan el dictamen al instante</span>
-        </div>
-        <div className="px-5 py-4 grid grid-cols-2 gap-x-6 gap-y-4">
+        {/* ── Panel de Ajuste Rápido integrado en el banner ── */}
+        <div className="px-6 pb-5 grid grid-cols-2 gap-x-6 gap-y-1">
           {/* Precio del Inmueble */}
           <div>
-            <div className="flex justify-between items-center mb-1.5">
+            <div className="flex justify-between items-baseline mb-1">
               <label className="text-[11px] font-bold text-slate-600">🏠 Precio del Inmueble</label>
               <span className="text-sm font-black text-blue-700">
                 {params.precioInmueble.toLocaleString("es-ES")} €
@@ -250,7 +235,7 @@ export default function SimulationCanvas() {
               step={5000}
               value={params.precioInmueble}
               onChange={(e) => setParam("precioInmueble", Number(e.target.value))}
-              className="w-full h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-blue-600"
+              className="w-full h-2 bg-white/60 rounded-full appearance-none cursor-pointer accent-blue-600"
             />
             <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
               <span>50.000 €</span>
@@ -260,7 +245,7 @@ export default function SimulationCanvas() {
 
           {/* Ahorros Aportados */}
           <div>
-            <div className="flex justify-between items-center mb-1.5">
+            <div className="flex justify-between items-baseline mb-1">
               <label className="text-[11px] font-bold text-slate-600">💰 Ahorros Aportados</label>
               <span className="text-sm font-black text-emerald-700">
                 {params.ahorrosAportados.toLocaleString("es-ES")} €
@@ -273,22 +258,22 @@ export default function SimulationCanvas() {
               step={1000}
               value={params.ahorrosAportados}
               onChange={(e) => setParam("ahorrosAportados", Number(e.target.value))}
-              className="w-full h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-emerald-600"
+              className="w-full h-2 bg-white/60 rounded-full appearance-none cursor-pointer accent-emerald-600"
             />
             <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
               <span>0 €</span>
               <span>{Math.round(params.precioInmueble * 0.6).toLocaleString("es-ES")} €</span>
             </div>
           </div>
-        </div>
 
-        {/* Indicador de recálculo en progreso */}
-        {isLoading && (
-          <div className="px-5 pb-3 flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse" />
-            <span className="text-[10px] text-blue-600 font-semibold">Recalculando dictamen…</span>
-          </div>
-        )}
+          {/* Indicador de recálculo */}
+          {isLoading && (
+            <div className="col-span-2 flex items-center gap-2 mt-1">
+              <div className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
+              <span className="text-[10px] text-blue-600 font-semibold">Recalculando dictamen…</span>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="p-6 space-y-6">
@@ -487,12 +472,6 @@ export default function SimulationCanvas() {
               className="bg-white text-blue-800 font-extrabold text-sm px-6 py-3 rounded-2xl hover:bg-blue-50 transition shadow-md transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
             >
               Descargar Informe Oficial en PDF
-            </button>
-            <button
-              onClick={reset}
-              className="bg-blue-900/60 hover:bg-blue-900/80 text-white font-bold text-sm px-5 py-3 rounded-2xl transition border border-white/20 cursor-pointer flex items-center gap-1.5"
-            >
-              <span>✨</span> Iniciar Nuevo Cálculo
             </button>
           </div>
         </div>
